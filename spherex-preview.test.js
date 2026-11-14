@@ -56,12 +56,15 @@ test('observatory includes required player elements and renders a streamed FITS 
     const path = new URL(url).pathname;
     const count = (attempts.get(path) ?? 0) + 1;
     attempts.set(path, count);
+    await new Promise(resolve => setTimeout(resolve, 30));
     if (path.includes('missing')) return new Response(null, {status: 404});
     if (path === product && count === 1) return new Response(null, {status: 503});
     return new Response(fits);
   };
-  const recovered = await (await request(base + '/spherex-preview?' + query)).json();
+  const [recovered, concurrent] = await Promise.all(
+    [1, 2].map(async () => (await request(base + '/spherex-preview?' + query)).json()));
   assert.deepEqual([...attempts.values()], [2, 1, 1]);
+  assert.deepEqual(concurrent, recovered);
   assert.equal(recovered.retryable, undefined);
   assert.deepEqual(recovered.diagnostics.map(item => item.stage),
     ['FITS or calibration parsing', 'cutout unavailable', 'FITS or calibration parsing']);

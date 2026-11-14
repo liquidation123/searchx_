@@ -4,6 +4,10 @@ import { calibratedCutout, differenceFrames } from './spherex-difference.mjs';
 const archive = 'https://irsa.ipac.caltech.edu';
 const maxBytes = 512 * 1024;
 const fitsBlock = 2880;
+const calibratedCache = new Map();
+const pendingCutouts = new Map();
+const cutoutCacheLifetime = 10 * 60 * 1000;
+const cutoutCacheLimit = 96;
 
 export function readScienceImage(bytes, extensions) {
   let offset = 0;
@@ -49,13 +53,15 @@ async function serveDifferences(products, ra, dec, response) {
     'Content-Type': 'application/json', 'Cache-Control': 'no-store',
   }).end(JSON.stringify(body));
   const stages = new Map();
-  async function download(product, index) {
-      const source = new URL(product, archive);
-      source.searchParams.set('center', ra + ',' + dec);
-      source.searchParams.set('size', '0.1');
+  const deadline = Date.now() + 26000;
+  async function fetchCutout(source, index) {
       stages.set(index, 'download or timeout');
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return null;
       try {
-        const upstream = await fetch(source, {redirect: 'error', signal: AbortSignal.timeout(12000)});
+        const upstream = await fetch(source, {
+          redirect: 'error', signal: AbortSignal.timeout(Math.min(12000, remaining)),
+        });
         if (!upstream.ok || !upstream.body) {
           if (upstream.status === 404 || upstream.status === 410) {
             stages.set(index, 'cutout unavailable');
@@ -91,16 +97,52 @@ async function serveDifferences(products, ra, dec, response) {
         return null;
       }
   }
-  const frames = await Promise.all(products.map(download));
+  async function download(product, index) {
+    const source = new URL(product, archive);
+    source.searchParams.set('center', ra + ',' + dec);
+    source.searchParams.set('size', '0.1');
+    const key = source.href;
+    const cached = calibratedCache.get(key);
+    if (cached?.expires > Date.now()) {
+      stages.set(index, 'FITS or calibration parsing');
+      return cached.frame;
+    }
+    calibratedCache.delete(key);
+    if (!pendingCutouts.has(key)) {
+      const work = fetchCutout(source, index).then(frame => {
+        if (frame) {
+          calibratedCache.set(key, {frame, expires: Date.now() + cutoutCacheLifetime});
+          if (calibratedCache.size > cutoutCacheLimit) {
+            calibratedCache.delete(calibratedCache.keys().next().value);
+          }
+        }
+        return {frame, stage: stages.get(index)};
+      }).finally(() => pendingCutouts.delete(key));
+      pendingCutouts.set(key, work);
+    }
+    const {frame, stage} = await pendingCutouts.get(key);
+    stages.set(index, stage);
+    return frame;
+  }
+  const frames = Array(products.length).fill(null);
+  async function downloadBatch(indexes) {
+    // Keep the archive fan-out below the number of frames in a full timeline.
+    let next = 0;
+    await Promise.all(Array.from({length: Math.min(3, indexes.length)}, async () => {
+      while (next < indexes.length) {
+        const index = indexes[next++];
+        frames[index] = await download(products[index], index);
+      }
+    }));
+  }
+  await downloadBatch(products.map((_, index) => index));
   let result = differenceFrames(frames, stages);
   const retry = products.flatMap((_, index) =>
     stages.get(index) === 'download or timeout' ? [index] : []);
-  if (!result && retry.length) {
+  if (!result && retry.length && deadline - Date.now() > 1000) {
     // Give a busy archive a moment to recover. Keep successful cutouts and retry only once.
     await new Promise(resolve => setTimeout(resolve, 400));
-    await Promise.all(retry.map(async index => {
-      frames[index] = await download(products[index], index);
-    }));
+    await downloadBatch(retry);
     result = differenceFrames(frames, stages);
   }
   const diagnostics = products.map((product, index) => ({product, stage: stages.get(index)}));

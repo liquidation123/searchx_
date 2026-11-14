@@ -1,8 +1,11 @@
+import { spectralProduct } from './spherex-observations.mjs';
+import { calibratedCutout, differenceFrames } from './spherex-difference.mjs';
+
 const archive = 'https://irsa.ipac.caltech.edu';
 const maxBytes = 512 * 1024;
 const fitsBlock = 2880;
 
-export function readScienceImage(bytes) {
+export function readScienceImage(bytes, extensions) {
   let offset = 0;
   while (offset + 80 <= bytes.length) {
     const header = new Map();
@@ -23,9 +26,11 @@ export function readScienceImage(bytes) {
     const bitpix = Number(header.get('BITPIX'));
     const count = axes ? dimensions.reduce((a, b) => a * b, 1) : 0;
     const size = (count + Number(header.get('PCOUNT') ?? 0)) * Number(header.get('GCOUNT') ?? 1) * Math.abs(bitpix) / 8;
-    if (!Number.isSafeInteger(size) || size < 0 || size > maxBytes) throw new Error('FITS extension exceeds preview limit');
+    if (!Number.isSafeInteger(size) || size < 0 || size > (extensions ? 5 * 1024 * 1024 : maxBytes)) throw new Error('FITS extension exceeds limit');
     if (data + size > bytes.length) return null;
-    if (header.get('EXTNAME') === 'IMAGE') {
+    if (extensions) {
+      extensions.set(header.get('EXTNAME'), {header, data: bytes.subarray(data, data + size)});
+    } else if (header.get('EXTNAME') === 'IMAGE') {
       if (axes !== 2 || bitpix !== -32 || !count || dimensions.some(n => !Number.isInteger(n) || n < 1 || n > 256)) {
         throw new Error('Unsupported SPHEREx image format');
       }
@@ -37,6 +42,75 @@ export function readScienceImage(bytes) {
     offset = data + Math.ceil(size / fitsBlock) * fitsBlock;
   }
   return null;
+}
+
+async function serveDifferences(products, ra, dec, response) {
+  const send = (body) => response.writeHead(200, {
+    'Content-Type': 'application/json', 'Cache-Control': 'no-store',
+  }).end(JSON.stringify(body));
+  const stages = new Map();
+  async function download(product, index) {
+      const source = new URL(product, archive);
+      source.searchParams.set('center', ra + ',' + dec);
+      source.searchParams.set('size', '0.1');
+      stages.set(index, 'download or timeout');
+      try {
+        const upstream = await fetch(source, {redirect: 'error', signal: AbortSignal.timeout(12000)});
+        if (!upstream.ok || !upstream.body) {
+          if (upstream.status === 404 || upstream.status === 410) {
+            stages.set(index, 'cutout unavailable');
+          } else if (upstream.status >= 400 && upstream.status < 500 &&
+                     upstream.status !== 408 && upstream.status !== 429) {
+            stages.set(index, 'cutout request rejected');
+          }
+          await upstream.body?.cancel().catch(() => {});
+          return null;
+        }
+        const reader = upstream.body.getReader();
+        try {
+          const chunks = [];
+          let size = 0;
+          while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            size += value.length;
+            if (size > 5 * 1024 * 1024) {
+              stages.set(index, 'byte limit');
+              return null;
+            }
+            chunks.push(value);
+          }
+          const extensions = new Map();
+          stages.set(index, 'FITS or calibration parsing');
+          readScienceImage(Buffer.concat(chunks), extensions);
+          return calibratedCutout(extensions, ra, dec);
+        } finally {
+          void reader.cancel().catch(() => {});
+        }
+      } catch {
+        return null;
+      }
+  }
+  const frames = await Promise.all(products.map(download));
+  let result = differenceFrames(frames, stages);
+  const retry = products.flatMap((_, index) =>
+    stages.get(index) === 'download or timeout' ? [index] : []);
+  if (!result && retry.length) {
+    // Give a busy archive a moment to recover. Keep successful cutouts and retry only once.
+    await new Promise(resolve => setTimeout(resolve, 400));
+    await Promise.all(retry.map(async index => {
+      frames[index] = await download(products[index], index);
+    }));
+    result = differenceFrames(frames, stages);
+  }
+  const diagnostics = products.map((product, index) => ({product, stage: stages.get(index)}));
+  if (!result) {
+    if (diagnostics.some(item => item.stage === 'download or timeout')) {
+      return send({retryable: true, reason: 'IRSA is temporarily unavailable for one or more exposures. Retry static source subtraction.', diagnostics});
+    }
+    return send({reason: 'Need two early and one later exposure with matching wavelength coverage and usable calibration.', diagnostics});
+  }
+  send({images: result.frames.map(frame => frame && renderSvg(frame, [0, result.high]).svg), diagnostics});
 }
 
 function renderSvg({width, height, pixels}, stretch) {
@@ -62,15 +136,20 @@ function renderSvg({width, height, pixels}, stretch) {
 }
 
 export async function servePreview(url, response) {
-  const product = url.searchParams.get('product') ?? '';
+  const products = url.searchParams.getAll('product');
+  const product = products[0] ?? '';
+  const difference = url.searchParams.get('view') === 'difference';
   const raw = ['ra', 'dec'].map(name => url.searchParams.get(name));
   const [ra, dec] = raw.map(Number);
-  if (!/^\/ibe\/data\/spherex\/dr1\/level2\/\d{4}W\d{2}_[A-Z0-9]+\/l2b-v\d+-\d{4}-\d+\/[1-6]\/level2_[A-Za-z0-9_-]+\.fits$/.test(product) ||
+  if (!spectralProduct.test(product) || (difference &&
+      (products.length < 3 || products.length > 8 || new Set(products).size !== products.length ||
+       products.some(path => !spectralProduct.test(path)))) ||
       raw.some(value => !value?.trim()) || ![ra, dec].every(Number.isFinite) ||
       ra < 0 || ra >= 360 || dec < -90 || dec > 90) {
     response.writeHead(400).end();
     return;
   }
+  if (difference) return serveDifferences(products, ra, dec, response);
   const source = new URL(product, archive);
   source.searchParams.set('center', ra + ',' + dec);
   source.searchParams.set('size', '0.1');

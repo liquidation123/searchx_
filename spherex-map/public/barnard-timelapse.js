@@ -2,14 +2,6 @@ const center = [269.44783234, 4.74805538];
 export const barnardMarker = { id: 'barnard-star', name: "Barnard's Star", ra: center[0], dec: center[1] };
 const radius = 2 / 60;
 const endpoint = '/timelapse/barnard-star/sequence';
-const radians = degrees => degrees * Math.PI / 180;
-
-function containsBarnard(ra, dec) {
-  const dDec = Math.sin(radians(dec - center[1]) / 2);
-  const dRa = Math.sin(radians(ra - center[0]) / 2);
-  return dDec ** 2 + Math.cos(radians(dec)) * Math.cos(radians(center[1])) *
-    dRa ** 2 <= Math.sin(radians(radius) / 2) ** 2;
-}
 
 export function setupBarnard(viewer, A, pointAt) {
   const byId = id => document.getElementById(id);
@@ -27,7 +19,7 @@ export function setupBarnard(viewer, A, pointAt) {
   const sky = byId('sky');
   const overlay = A.graphicOverlay({ name: 'Selected region', color: '#ffc779', lineWidth: 2 });
   viewer.addOverlay(overlay);
-  let timer, pending, manifest, startPoint;
+  let timer, pending, manifest;
   let revision = 0;
   let regionRequest, selectedRegion;
   let lastPrefetch = -Infinity;
@@ -210,20 +202,9 @@ export function setupBarnard(viewer, A, pointAt) {
     }
   }
 
-  select.addEventListener('click', () => {
-    const active = select.getAttribute('aria-pressed') !== 'true';
-    setSelecting(active);
-    if (!active) return;
-    reset();
-    delete status.dataset.loading;
-    status.textContent = 'Click or tap the sky to select a four-arcminute region.';
-  });
   find.addEventListener('click', () => {
     pointAt(...center, .14);
-    setSelecting(true);
-    reset();
-    delete status.dataset.loading;
-    status.textContent = 'Click or tap the centre of the map to load the time-lapse.';
+    load(true);
   });
   retry.addEventListener('click', () => selectedRegion ? loadRegion(...selectedRegion) : load(true));
   byId('barnard-close').addEventListener('click', () => {
@@ -234,33 +215,6 @@ export function setupBarnard(viewer, A, pointAt) {
     setSelecting(false);
     select.focus();
   });
-  sky.addEventListener('pointerdown', event => {
-    startPoint = [event.clientX, event.clientY];
-  }, true);
-  sky.addEventListener('pointerup', event => {
-    const point = startPoint;
-    startPoint = undefined;
-    if (!point || select.getAttribute('aria-pressed') !== 'true' ||
-        Math.hypot(event.clientX - point[0], event.clientY - point[1]) > 6) return;
-    const rect = sky.getBoundingClientRect();
-    let coordinates;
-    try {
-      coordinates = viewer.pix2world(event.clientX - rect.left, event.clientY - rect.top, 'ICRS');
-    } catch {
-      return;
-    }
-    if (!coordinates?.every(Number.isFinite)) return;
-    const [ra, dec] = coordinates;
-    overlay.removeAll();
-    overlay.add(A.circle(ra, dec, radius));
-    if (containsBarnard(ra, dec)) {
-      load();
-    } else {
-      reset();
-      delete status.dataset.loading;
-      status.textContent = 'Time-lapse is currently available for Barnard’s Star.';
-    }
-  }, true);
 
   slider.addEventListener('input', () => { stop(); showFrame(Number(slider.value)); });
   play.addEventListener('click', () => {

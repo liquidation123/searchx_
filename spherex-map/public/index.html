@@ -29,7 +29,7 @@
           <p>Drag to move across the sky. Use + and − to zoom. Use Recenter to return to your last target and its original zoom.</p>
           <p>DSS2 shows optical color imagery; switch to SPHEREx to compare the same sky in infrared.</p><p>SPHEREx sees infrared light our eyes can’t see. Pick a wavelength to see which features stand out. Each setting shows a different wavelength of the same sky survey.</p>
           <p>Select a labeled pin to learn about the object, or try one of these objects.</p><p><strong>About this image:</strong> HiPS imagery loads in tiles. The SPHEREx all-sky cube has a finite resolution (about 12.9 arcseconds per pixel); zooming further cannot reveal finer SPHEREx detail. Dark regions can have several causes; this display alone cannot identify missing data. <a href="https://irsa.ipac.caltech.edu/onlinehelp/spherex/spherex/visualization.html" target="_blank" rel="noopener noreferrer">About the data ↗</a></p>
-          <p>Click the sky to play a NEOWISE time-lapse. Use Observations here to list SPHEREx exposures at the map centre.</p>
+          <p>Click the sky or use Select region for a six-arcminute SPHEREx cutout. Observations here uses the map centre.</p>
 
           <div id="references"></div>
           <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">NASA / IPAC SPHEREx DR1</a> · <a href="https://github.com/cds-astro/aladin-lite/tree/v3.8.1">CDS Aladin Lite</a> · <a href="/vendor/LICENSE">License</a></p>
@@ -54,7 +54,8 @@
   </section>
   <section id="observation-panel" class="story-section" aria-labelledby="observation-heading" hidden>
     <button id="observation-close" class="section-close" type="button" aria-label="Close SPHEREx observations" hidden>×</button>
-    <h2 id="observation-heading">A closer look <span> / SPHEREx DR1</span></h2>
+    <h2 id="observation-heading">A closer look <span> / SPHEREx DR1 and QR3</span></h2>
+    <p id="observation-frame-note">Frames use one detector. Wavelength and image orientation can vary between exposures.</p>
     <p id="observation-position"></p>
     <p id="observation-status" role="status"></p><dl id="radio-fields" hidden></dl><a id="radio-source" target="_blank" rel="noopener noreferrer" hidden>Open CHIME/FRB Catalog 2 event ↗</a><details id="observation-available-dates" hidden><summary>Available observation dates and FITS files</summary><ul id="observation-date-list"></ul></details>
     <p id="observation-placeholder" role="status" hidden></p>
@@ -69,9 +70,11 @@
         <button id="observation-zoom-in" type="button" aria-label="Zoom in">+</button>
       </div>
       <button id="observation-play" type="button">Play</button>
+      <label><input id="observation-difference" type="checkbox" disabled> Hide static sources</label>
+      <p id="observation-difference-status" role="status"></p>
       <input id="observation-frame" type="range" min="0" max="0" value="0" aria-label="Observation date">
       <p><output id="observation-date"></output></p>
-      <a id="observation-source" target="_blank" rel="noopener noreferrer">Download this SPHEREx FITS cutout ↗</a>
+      <a id="observation-source" target="_blank" rel="noopener noreferrer">Source SPHEREx FITS at NASA/IPAC IRSA ↗</a>
       <p>Previews show individual SPHEREx exposures. Brightness uses a shared scale across this sequence. Detector orientation and wavelength can vary across exposures. Use the FITS cutout for measurements.</p>
     </div>
   </section>
@@ -85,7 +88,7 @@
       </details>
 </section>  <section id="barnard-panel" class="story-section" aria-label="Sky time-lapse" hidden>
     <button id="barnard-close" type="button" aria-label="Close time-lapse">×</button>
-    <h2 id="barnard-heading">Sky time-lapse</h2>
+    <h2 id="barnard-heading">Historical NEOWISE W1 time-lapse</h2>
     <p id="barnard-position"></p>
     <p id="barnard-status" role="status"></p>
     <button id="barnard-find" type="button">Find it on the map</button>
@@ -98,7 +101,7 @@
       <a id="barnard-source" target="_blank" rel="noopener noreferrer">Source observation at NASA/IPAC IRSA</a>
     </div>
   </section>
-<section id="quiz" class="story-section" hidden aria-labelledby="quiz-heading"><button type="button" id="quiz-back" class="text-button">← Back to story</button><p class="eyebrow" id="quiz-progress"></p><h2 id="quiz-heading" tabindex="-1"></h2><div id="quiz-answers" class="quiz-answers"></div><p id="quiz-feedback" role="status" aria-live="polite"></p><button type="button" id="quiz-next" hidden>Continue →</button><p id="quiz-complete" hidden>Two questions complete. Keep exploring the sky.</p><button id="explore-another" type="button" hidden>Explore another object →</button></section><div id="story-action" hidden><button type="button" id="quiz-start">Observe <span aria-hidden="true">→</span></button></div></div><div id="panel-resize" role="separator" aria-label="Resize information panel" aria-orientation="vertical" tabindex="0" aria-valuemin="300" aria-valuemax="440" aria-valuenow="340"></div></aside>
+<section id="quiz" class="story-section" hidden aria-labelledby="quiz-heading"><button type="button" id="quiz-back" class="text-button">← Back to story</button><p class="eyebrow" id="quiz-progress"></p><h2 id="quiz-heading" tabindex="-1"></h2><div id="quiz-answers" class="quiz-answers"></div><p id="quiz-feedback" role="status" aria-live="polite"></p><button type="button" id="quiz-next" hidden>Continue →</button><p id="quiz-complete" hidden></p><button id="explore-another" type="button" hidden>Explore another object →</button></section><div id="story-action" hidden><button type="button" id="quiz-start">Observe <span aria-hidden="true">→</span></button></div></div><div id="panel-resize" role="separator" aria-label="Resize information panel" aria-orientation="vertical" tabindex="0" aria-valuemin="300" aria-valuemax="440" aria-valuenow="340"></div></aside>
   <div class="coordinates"><output id="position"></output><a id="image-source" href="https://doi.org/10.26093/cds/aladin/ht9n-7r">DSS2 · STScI/NASA, CDS</a></div>
 </main>
 </body>

@@ -48,6 +48,24 @@ test('observatory includes required player elements and renders a streamed FITS 
   const unavailable = await request(base + '/spherex-preview?' + query);
   assert.equal(unavailable.status, 502);
   assert.equal(unavailable.headers.get('cache-control'), 'no-store');
+  query.set('view', 'difference');
+  query.append('product', product.replace('example', 'missing'));
+  query.append('product', product.replace('example', 'healthy'));
+  const attempts = new Map();
+  globalThis.fetch = async url => {
+    const path = new URL(url).pathname;
+    const count = (attempts.get(path) ?? 0) + 1;
+    attempts.set(path, count);
+    if (path.includes('missing')) return new Response(null, {status: 404});
+    if (path === product && count === 1) return new Response(null, {status: 503});
+    return new Response(fits);
+  };
+  const recovered = await (await request(base + '/spherex-preview?' + query)).json();
+  assert.deepEqual([...attempts.values()], [2, 1, 1]);
+  assert.equal(recovered.retryable, undefined);
+  assert.deepEqual(recovered.diagnostics.map(item => item.stage),
+    ['FITS or calibration parsing', 'cutout unavailable', 'FITS or calibration parsing']);
+  query.delete('view');
   query.set('product', 'https://example.com/not-fits');
   assert.equal((await request(base + '/spherex-preview?' + query)).status, 400);
 });

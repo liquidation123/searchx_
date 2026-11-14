@@ -362,44 +362,126 @@ target.addEventListener('blur',()=>setTimeout(()=>{if(!byId('navigation').contai
 byId('close-lesson').addEventListener('click',()=>{byId('lesson').hidden=true;resetQuiz();target.focus({preventScroll:true});dismiss();});
 
 
-const reviewedQuestions = {
-  'M 42': [
-    {question:'What is the Orion Nebula?',choices:['A region where stars form','A single nearby planet','A radio burst'],correct:0,feedback:'Its gas and dust make it a stellar nursery.'},
-    {question:'What can a dated SPHEREx exposure establish?',choices:['When this field was observed','That a star was born on that date','That every bright spot changed'],correct:0,feedback:'The date identifies an exposure; a physical change needs comparable measurements.'}
-  ],
-  'Barnard 33': [
-    {question:'Why does the Horsehead appear dark in optical light?',choices:['Dust blocks background light','It contains no matter','It is outside the Galaxy'],correct:0,feedback:'Its dust is silhouetted against brighter gas behind it.'},
-    {question:'What can infrared imagery help reveal?',choices:['Structure obscured by dust','The exact age of every star','A verified change from one frame'],correct:0,feedback:'Infrared views can reveal different structure, but a single image cannot verify change.'}
-  ],
-  'M 31': [
-    {question:'What is Andromeda?',choices:['A galaxy with many stars','One star','One SPHEREx detector'],correct:0,feedback:'Andromeda is a nearby spiral galaxy.'},
-    {question:'What does an exposure date describe?',choices:['When the image was acquired','The age of the galaxy','A confirmed new object'],correct:0,feedback:'Dates describe observations, not the galaxy’s age or a discovery.'}
-  ]
+const commonQuestions = [
+  {
+    question: 'What kind of light does SPHEREx observe?',
+    choices: ['Infrared light', 'Only visible light', 'Sound waves'],
+    correct: 0,
+    feedback: 'SPHEREx measures infrared light across many wavelengths.',
+  },
+  {
+    question: 'What changes when you pick a different SPHEREx wavelength?',
+    choices: ['The position on the sky', 'The band of infrared light you are viewing', 'The date of the exposure'],
+    correct: 1,
+    feedback: 'The wavelength control changes which band of infrared light is shown. The observation player shows exposures by date.',
+  },
+  {
+    question: 'What does an observation date tell you?',
+    choices: ['The exact age of the object', 'Whether the object moved', 'When the telescope took the exposure'],
+    correct: 2,
+    feedback: 'An observation date tells you when the light was recorded. You need more evidence to detect a change.',
+  },
+  {
+    question: 'What do right ascension (RA) and declination (Dec) give you?',
+    choices: ['A position on the sky', 'The distance from Earth', 'The temperature of an object'],
+    correct: 0,
+    feedback: 'RA and Dec are two angles that locate an object on the sky.',
+  },
+  {
+    question: 'What should you check if a star seems to shift between two dates?',
+    choices: ['Whether the newer image is brighter', 'Whether both previews are the same color', 'Whether nearby stars line up and the wavelengths are comparable'],
+    correct: 2,
+    feedback: 'Align the images using nearby stars and check the wavelengths before treating an apparent shift as motion.',
+  },
+];
+
+const objectQuestions = {
+  'M 42': {
+    question: 'Why do astronomers call the Orion Nebula a stellar nursery?',
+    choices: ['It is a galaxy full of old stars', 'New stars are forming in its gas and dust', 'Its stars all formed outside Orion'],
+    correct: 1,
+    feedback: 'The Orion Nebula contains young stars and clouds of gas and dust where stars are forming.',
+  },
+  'Barnard 33': {
+    question: 'Why does the Horsehead look dark in the optical image?',
+    choices: ['Its dust blocks light from the bright gas behind it', 'It is an empty patch of sky', 'All the stars in that field have gone out'],
+    correct: 0,
+    feedback: 'The Horsehead is a dusty cloud seen in silhouette against glowing gas.',
+  },
+  'M 31': {
+    question: 'What is Andromeda?',
+    choices: ['A nearby spiral galaxy', 'A single star', 'A SPHEREx detector'],
+    correct: 0,
+    feedback: 'Andromeda is a nearby spiral galaxy containing many stars.',
+  },
 };
-let questions = [];
+const reviewedQuestions = objectQuestions;
 let quizIndex = 0;
-function resetQuiz() { byId('quiz').hidden=true; byId('quiz-complete').hidden=true; byId('explore-another').hidden=true; document.querySelector('main').classList.remove('quiz-open'); quizIndex=0; }
+let quizQuestions = [];
+function resetQuiz() {
+  byId('quiz').hidden = true;
+  byId('quiz-complete').hidden = true;
+  byId('explore-another').hidden = true;
+  byId('quiz-answers').replaceChildren();
+  document.querySelector('main').classList.remove('quiz-open');
+  quizIndex = 0;
+  quizQuestions = [];
+}
+
 function showQuestion() {
-  const q=questions[quizIndex]; byId('quiz-progress').textContent=`QUESTION ${quizIndex+1} / ${questions.length}`;
-  byId('quiz-heading').textContent=q.question; byId('quiz-feedback').textContent=''; byId('quiz-next').hidden=true;
-  const answers=byId('quiz-answers'); answers.replaceChildren();
-  q.choices.forEach((choice,index)=>{const b=document.createElement('button'); b.type='button'; b.textContent=choice; b.addEventListener('click',()=>{
-    for(const item of answers.children)item.disabled=true;
-    b.classList.add(index===q.correct?'correct':'incorrect');
-    byId('quiz-feedback').textContent=(index===q.correct?'Correct. ':'Not quite. ')+q.feedback;
-    byId('quiz-next').textContent=quizIndex===questions.length-1?'Return to the sky →':'Next question →'; byId('quiz-next').hidden=false;
-  }); answers.append(b);});
+  const question = quizQuestions[quizIndex];
+  byId('quiz-progress').textContent = 'QUESTION ' + (quizIndex + 1) + ' / ' + quizQuestions.length;
+  byId('quiz-heading').textContent = question.question;
+  byId('quiz-feedback').textContent = '';
+  byId('quiz-next').hidden = true;
+
+  const answers = byId('quiz-answers');
+  answers.replaceChildren();
+  question.choices.forEach((choice, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = choice;
+    button.addEventListener('click', () => {
+      for (const answer of answers.children) answer.disabled = true;
+      const correct = index === question.correct;
+      button.classList.add(correct ? 'correct' : 'incorrect');
+      answers.children[question.correct].classList.add('correct');
+      byId('quiz-feedback').textContent = (correct ? 'Correct. ' : 'Not quite. ') + question.feedback;
+      byId('quiz-next').textContent = quizIndex === quizQuestions.length - 1 ? 'Finish quiz →' : 'Next question →';
+      byId('quiz-next').hidden = false;
+      byId('quiz-next').focus();
+    });
+    answers.append(button);
+  });
+  byId('quiz-heading').focus();
 }
 byId('quiz-start').addEventListener('click',()=>setStage(document.querySelector('main').dataset.stage==='discover'?'observe':'understand'));
 byId('quiz-back').addEventListener('click',()=>setStage('observe'));
-byId('quiz-next').addEventListener('click',()=>{if(quizIndex+1<questions.length){quizIndex++;showQuestion();}else{byId('quiz-answers').replaceChildren();byId('quiz-heading').textContent='Well explored';byId('quiz-progress').textContent='COMPLETE';byId('quiz-feedback').textContent='';byId('quiz-next').hidden=true;byId('quiz-complete').hidden=false;byId('explore-another').hidden=false;}});
+byId('quiz-next').addEventListener('click', () => {
+  if (quizIndex + 1 < quizQuestions.length) {
+    quizIndex++;
+    showQuestion();
+    return;
+  }
+  byId('quiz-answers').replaceChildren();
+  byId('quiz-heading').textContent = 'Well explored';
+  byId('quiz-progress').textContent = 'COMPLETE';
+  byId('quiz-feedback').textContent = '';
+  byId('quiz-next').hidden = true;
+  byId('quiz-complete').textContent = quizQuestions.length + ' questions complete. Keep exploring the sky.';
+  byId('quiz-complete').hidden = false;
+  byId('explore-another').hidden = false;
+  byId('quiz-heading').focus();
+});
 function setStage(stage) {
   if(stage==='understand' && !reviewedQuestions[selectedReference?.id]) return;
   const main=document.querySelector('main'); main.dataset.stage=stage;
-  if(stage==='understand') questions=reviewedQuestions[selectedReference.id];
-  byId('quiz').hidden=stage!=='understand';
-  if(stage==='understand' && !byId('quiz-complete').hidden) resetQuiz();
-  if(stage==='understand' && byId('quiz-answers').childElementCount===0) {quizIndex=0;showQuestion();}
+  if (stage === 'understand' && !byId('quiz-complete').hidden) resetQuiz();
+  byId('quiz').hidden = stage !== 'understand';
+  if (stage === 'understand' && quizQuestions.length === 0) {
+    quizQuestions = [...commonQuestions, objectQuestions[selectedReference.id]];
+    showQuestion();
+  }
   for(const button of byId('panel-stages').querySelectorAll('button')) button.setAttribute('aria-current',button.dataset.stage===stage?'step':'false');
   byId('quiz-start').innerHTML=stage==='discover'?'Observe <span aria-hidden="true">→</span>':'Understand <span aria-hidden="true">→</span>';
   byId('story-action').hidden=stage==='understand' || (stage==='observe' && !reviewedQuestions[selectedReference?.id]);

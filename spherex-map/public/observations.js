@@ -1,11 +1,26 @@
 export function setupObservations(viewer, A, closeInspector) {
   const byId = id => document.getElementById(id);
   const sky = byId('sky');
+  const region = byId('barnard-select');
+  const setSelecting = active => {
+    region.setAttribute('aria-pressed', String(active));
+    sky.classList.toggle('select-region', active);
+  };
   const panel = byId('observation-panel');
   const position = byId('observation-position');
   const status = byId('observation-status');
   const player = byId('observation-player');
   const slider = byId('observation-frame');
+  const difference = byId('observation-difference');
+  const differenceStatus = byId('observation-difference-status');
+  const differenceRetry = document.createElement('button');
+  differenceRetry.type = 'button';
+  differenceRetry.textContent = 'Retry static source subtraction';
+  differenceRetry.hidden = true;
+  differenceStatus.after?.(differenceRetry);
+  differenceRetry.addEventListener('click', () => { if (selected) void prepareDifferences(...selected); });
+  let filtered;
+  let differenceRequest;
   const play = byId('observation-play');
   const cutout = byId('observation-source');
   const image = byId('observation-image');
@@ -30,6 +45,12 @@ export function setupObservations(viewer, A, closeInspector) {
   zoomIn.addEventListener('click', () => setZoom(zoom * 2));
 
   function resetPreview() {
+    differenceRequest?.abort();
+    filtered = undefined;
+    difference.checked = false;
+    difference.disabled = true;
+    differenceStatus.textContent = '';
+    differenceRetry.hidden = true;
     stretch = undefined;
     viewport.hidden = true;
     setZoom(1);
@@ -38,6 +59,8 @@ export function setupObservations(viewer, A, closeInspector) {
     previewCache = new Map();
     image.hidden = true;
     image.removeAttribute('src');
+    cutout.removeAttribute('href');
+    byId('observation-date').textContent = '';
     imageStatus.hidden = true;
     byId('observation-alternative').hidden = true;
     byId('observation-fits-fallback').hidden = true;
@@ -64,8 +87,9 @@ export function setupObservations(viewer, A, closeInspector) {
     return '/spherex-preview?' + query;
   }
 
-  function loadPreview(frame) {
-    const url = previewUrl(frame);
+  function loadPreview(frame, index) {
+    const residual = difference.checked && filtered?.[index];
+    const url = residual ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(residual) : previewUrl(frame);
     if (!previewCache.has(url)) {
       const preload = new Image();
       preload.src = url;
@@ -88,7 +112,7 @@ export function setupObservations(viewer, A, closeInspector) {
     if (!frame) return false;
     const revision = ++previewRevision;
     try {
-      const src = await loadPreview(frame);
+      const src = await loadPreview(frame, index);
       if (revision !== previewRevision) return false;
       failedFrame = undefined;
       byId('observation-retry').hidden = true;
@@ -115,17 +139,65 @@ export function setupObservations(viewer, A, closeInspector) {
     byId('observation-fits-fallback').hidden = true;
     slider.value = index;
     image.dataset.frame = index;
-    const date = new Date((frame.mjd - 40587) * 86400000);
-    byId('observation-date').textContent = date.toISOString().slice(0, 10) +
-      ' · MJD ' + frame.mjd.toFixed(4) + ' · ' + frame.detector;
-    cutout.href = frame.cutoutUrl;
-    if (frames.length > 1) void loadPreview(frames[(index + 1) % frames.length]).catch(() => {});
+    byId('observation-date').textContent = frame.observedAt.slice(0, 19).replace('T', ' ') +
+      ' UTC · ' + frame.detector + ' · ' + frame.release;
+    cutout.href = frame.sourceUrl;
+    status.textContent = sequenceStatus;
+    if (filtered) {
+      difference.disabled = !difference.checked && !filtered[index];
+      differenceStatus.textContent = difference.checked
+        ? (filtered[index] ? 'Changes relative to early frames' : 'Original exposure. This frame has no compatible reference.')
+        : (filtered[index] ? '' : 'Static source subtraction is unavailable for this exposure.');
+    }
+    const next = (index + 1) % frames.length;
+    if (frames.length > 1) void loadPreview(frames[next], next).catch(() => {});
     return true;
   }
 
-  async function select(ra, dec) {
+  let sequenceStatus = '';
+  async function prepareDifferences(ra, dec) {
+    differenceRequest?.abort();
+    differenceRetry.hidden = true;
+    if (frames.length < 3) {
+      differenceStatus.textContent = 'Static source subtraction needs at least three exposures.';
+      return;
+    }
+    const current = new AbortController();
+    differenceRequest = current;
+    differenceStatus.textContent = 'Checking exposure compatibility for static source subtraction…';
+    const query = new URLSearchParams({ra, dec, view: 'difference'});
+    for (const frame of frames) query.append('product', new URL(frame.cutoutUrl).pathname);
+    try {
+      const answer = await fetch('/spherex-preview?' + query, {signal: current.signal});
+      if (!answer.ok) throw new Error('Subtraction unavailable');
+      const result = await answer.json();
+      if (current.signal.aborted) return;
+      filtered = result.images;
+      differenceRetry.hidden = !result.retryable;
+      const available = filtered?.[Number(image.dataset.frame)] && !image.hidden;
+      difference.disabled = !available;
+      differenceStatus.textContent = available ? '' : result.reason ??
+        'Static source subtraction is unavailable for this exposure.';
+    } catch {
+      if (!current.signal.aborted) {
+        differenceStatus.textContent = 'Could not check exposure compatibility.';
+        differenceRetry.hidden = false;
+      }
+    }
+  }
+
+  difference.addEventListener('change', async () => {
+    stop();
+    const timeline = differenceRequest;
+    const shown = showFrame(Number(image.dataset.frame));
+    const revision = previewRevision;
+    if (!await shown && timeline === differenceRequest && revision === previewRevision) {
+      difference.checked = !difference.checked;
+    }
+  });
+  async function select(ra, dec, autoplay = false) {
     if (![ra, dec].every(Number.isFinite)) return;
-    if (byId('barnard-select').getAttribute('aria-pressed') === 'true') return;
+    setSelecting(false);
     if (!byId('barnard-panel').hidden) byId('barnard-close').click();
     request?.abort();
     const current = new AbortController();
@@ -133,6 +205,7 @@ export function setupObservations(viewer, A, closeInspector) {
     selected = [ra, dec];
     resetPreview();
     byId('observation-heading').querySelector('span').textContent = ' / SPHEREx DR1';
+    byId('observation-frame-note').hidden = false;
     frames = [];
     stop();
     panel.hidden = false;
@@ -140,7 +213,7 @@ export function setupObservations(viewer, A, closeInspector) {
     overlay.removeAll();
     overlay.add(A.circle(ra, dec, .05));
     position.textContent = 'RA ' + ra.toFixed(4) + '° · Dec ' + dec.toFixed(4) + '°';
-    status.textContent = 'Looking for SPHEREx DR1 observations…';
+    status.textContent = 'Looking for SPHEREx DR1 and QR3 observations…';
     byId('observation-retry').hidden = true;
     const query = new URLSearchParams({ ra: ra.toFixed(6), dec: dec.toFixed(6) });
     try {
@@ -161,12 +234,16 @@ export function setupObservations(viewer, A, closeInspector) {
       }
       byId('observation-available-dates').hidden = frames.length === 0;
       if (!frames.length) {
-        status.textContent = 'No matching DR1 wide-survey exposures found at this position.';
+        status.textContent = results.truncated ? 'IRSA returned partial coverage. Try again.' :
+          'No matching SPHEREx wide-survey exposures found at this position.';
+        byId('observation-retry').hidden = !results.truncated;
         byId('observation-alternative').hidden = false;
         return;
       }
-      status.textContent = frames.length === 1 ? 'One observation date found.' :
+      sequenceStatus = frames.length === 1 ? 'One observation date found.' :
         frames.length + ' observation dates from the same detector.';
+      if (results.truncated) sequenceStatus += ' IRSA returned partial archive coverage.';
+      status.textContent = sequenceStatus;
       imageStatus.hidden = false;
       imageStatus.textContent = 'Loading first SPHEREx image…';
       let reference = 0;
@@ -184,9 +261,10 @@ export function setupObservations(viewer, A, closeInspector) {
       }
       slider.max = frames.length - 1;
       slider.disabled = play.disabled = frames.length < 2;
+      player.hidden = false;
       const shown = await showFrame(reference < frames.length ? reference : 0);
-      if (current.signal.aborted) return;
-      player.hidden = !shown;
+      if (!current.signal.aborted) void prepareDifferences(ra, dec);
+      if (shown && !current.signal.aborted && autoplay && frames.length > 1) play.click();
     } catch {
       if (current.signal.aborted) return;
       status.textContent = 'IRSA couldn’t return observations. Try again or choose another spot.';
@@ -196,6 +274,7 @@ export function setupObservations(viewer, A, closeInspector) {
   }
 
   select.radio = reference => {
+    setSelecting(false);
     request?.abort();
     resetPreview();
     stop();
@@ -206,6 +285,7 @@ export function setupObservations(viewer, A, closeInspector) {
     panel.hidden = false;
     byId('observation-retry').hidden = true;
     byId('observation-heading').querySelector('span').textContent = ' / CHIME/FRB Catalog 2';
+    byId('observation-frame-note').hidden = true;
     position.textContent = reference.id + ' · published radio transient';
     status.textContent = 'These are CHIME radio measurements. An optical or SPHEREx image at this position is not an image of the burst.';
     const fields = byId('radio-fields');
@@ -255,12 +335,13 @@ export function setupObservations(viewer, A, closeInspector) {
     gesture = undefined;
     if (start?.id !== event.pointerId || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) return;
     const coords = coordinatesAt(event.clientX, event.clientY);
-    if (coords && byId('barnard-select').getAttribute('aria-pressed') !== 'true') {
+    if (coords) {
       closeInspector();
-      void select(...coords);
+      void select(...coords, true);
     }
   }, true);
   byId('observation-close').addEventListener('click', () => {
+    setSelecting(false);
     request?.abort();
     resetPreview();
     stop();
@@ -269,14 +350,17 @@ export function setupObservations(viewer, A, closeInspector) {
     byId('observation-center').focus();
   });
   byId('observation-retry').addEventListener('click', () => { if (frames.length && !player.hidden) void showFrame(failedFrame ?? Number(slider.value)); else if (selected) void select(...selected); });
-  byId('barnard-select').addEventListener('click', () => {
-    if (!panel.hidden && byId('barnard-select').getAttribute('aria-pressed') === 'true') {
-      request?.abort();
-      resetPreview();
-      stop();
-      overlay.removeAll();
-      panel.hidden = true;
-    }
+  region.addEventListener('click', () => {
+    const activate = region.getAttribute('aria-pressed') !== 'true';
+    select.close();
+    if (!activate) return;
+    if (!byId('barnard-panel').hidden) byId('barnard-close').click();
+    setSelecting(true);
+    panel.hidden = false;
+    player.hidden = true;
+    position.textContent = '';
+    status.textContent = 'Click or tap the sky to select a six-arcminute SPHEREx cutout.';
+    byId('observation-retry').hidden = true;
   });
   byId('observation-center').addEventListener('click', () => { void select(...viewer.getRaDec()); });
   byId('observation-center').disabled = false;
@@ -294,6 +378,6 @@ export function setupObservations(viewer, A, closeInspector) {
     timer = setTimeout(advance, 1000);
   });
 
-  select.close = () => { request?.abort(); resetPreview(); stop(); overlay.removeAll(); panel.hidden = true; };
+  select.close = () => { setSelecting(false); request?.abort(); resetPreview(); stop(); overlay.removeAll(); panel.hidden = true; };
   return select;
 }

@@ -49,14 +49,23 @@ async function serveDifferences(products, ra, dec, response) {
     'Content-Type': 'application/json', 'Cache-Control': 'no-store',
   }).end(JSON.stringify(body));
   const stages = new Map();
-  const frames = await Promise.all(products.map(async (product, index) => {
+  async function download(product, index) {
       const source = new URL(product, archive);
       source.searchParams.set('center', ra + ',' + dec);
       source.searchParams.set('size', '0.1');
       stages.set(index, 'download or timeout');
       try {
-        const upstream = await fetch(source, {redirect: 'error', signal: AbortSignal.timeout(15000)});
-        if (!upstream.ok || !upstream.body) return null;
+        const upstream = await fetch(source, {redirect: 'error', signal: AbortSignal.timeout(12000)});
+        if (!upstream.ok || !upstream.body) {
+          if (upstream.status === 404 || upstream.status === 410) {
+            stages.set(index, 'cutout unavailable');
+          } else if (upstream.status >= 400 && upstream.status < 500 &&
+                     upstream.status !== 408 && upstream.status !== 429) {
+            stages.set(index, 'cutout request rejected');
+          }
+          await upstream.body?.cancel().catch(() => {});
+          return null;
+        }
         const reader = upstream.body.getReader();
         try {
           const chunks = [];
@@ -81,12 +90,23 @@ async function serveDifferences(products, ra, dec, response) {
       } catch {
         return null;
       }
-  }));
-  const result = differenceFrames(frames, stages);
+  }
+  const frames = await Promise.all(products.map(download));
+  let result = differenceFrames(frames, stages);
+  const retry = products.flatMap((_, index) =>
+    stages.get(index) === 'download or timeout' ? [index] : []);
+  if (!result && retry.length) {
+    // Give a busy archive a moment to recover. Keep successful cutouts and retry only once.
+    await new Promise(resolve => setTimeout(resolve, 400));
+    await Promise.all(retry.map(async index => {
+      frames[index] = await download(products[index], index);
+    }));
+    result = differenceFrames(frames, stages);
+  }
   const diagnostics = products.map((product, index) => ({product, stage: stages.get(index)}));
   if (!result) {
     if (diagnostics.some(item => item.stage === 'download or timeout')) {
-      return send({retryable: true, reason: 'IRSA cutouts could not be downloaded. Try again.', diagnostics});
+      return send({retryable: true, reason: 'IRSA is temporarily unavailable for one or more exposures. Retry static source subtraction.', diagnostics});
     }
     return send({reason: 'Need two early and one later exposure with matching wavelength coverage and usable calibration.', diagnostics});
   }

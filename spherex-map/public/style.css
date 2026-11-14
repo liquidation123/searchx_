@@ -335,3 +335,11 @@ main.panel-collapsed #panel-stages,main.panel-collapsed #panel-body,main.panel-c
   main.sheet-expanded #story-sidebar{max-height:80dvh;}
   #sheet-toggle{display:flex;justify-content:space-between;padding:14px 18px;text-align:left;}
 }
+#catalog-status{position:absolute;right:20px;bottom:102px;margin:0;padding:5px 8px;border-radius:6px;background:#f8fafce8;color:#52657a;font-size:.65rem;pointer-events:none}
+#panel-stages button[hidden]{display:none}
+
+/* Keep the sky underneath the compact panel rather than exposing an empty strip. */
+@media(min-width:851px){main.story-open #sky,main.story-open #map-pins{left:0;width:100%}}
+#observation-available-dates{font-size:.73rem;color:#52657a;margin:10px 0}
+#observation-available-dates summary{cursor:pointer;color:#1762a9}
+#observation-date-list{padding-left:18px;line-height:1.75}

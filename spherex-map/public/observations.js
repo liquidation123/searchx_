@@ -41,6 +41,8 @@ export function setupObservations(viewer, A, closeInspector) {
     imageStatus.hidden = true;
     byId('observation-alternative').hidden = true;
     byId('observation-fits-fallback').hidden = true;
+    byId('observation-available-dates').hidden = true;
+    byId('observation-date-list').replaceChildren();
   }
   const overlay = A.graphicOverlay({ name: 'SPHEREx observation position', color: '#8eeade', lineWidth: 2 });
   viewer.addOverlay(overlay);
@@ -144,6 +146,17 @@ export function setupObservations(viewer, A, closeInspector) {
       const results = await response.json();
       if (current.signal.aborted) return;
       frames = results.frames;
+      const dateList = byId('observation-date-list');
+      dateList.replaceChildren();
+      for (const frame of frames) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = frame.cutoutUrl;
+        link.target = '_blank'; link.rel = 'noopener noreferrer';
+        link.textContent = new Date((frame.mjd - 40587) * 86400000).toISOString().slice(0, 10) + ' · ' + frame.detector + ' · FITS ↗';
+        item.append(link); dateList.append(item);
+      }
+      byId('observation-available-dates').hidden = frames.length === 0;
       if (!frames.length) {
         status.textContent = 'No matching DR1 wide-survey exposures found at this position.';
         byId('observation-alternative').hidden = false;

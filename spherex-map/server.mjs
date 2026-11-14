@@ -1,3 +1,6 @@
+import { serveNameResolve } from '../name-resolve.mjs';
+import { serveGaiaSource } from '../gaia-source.mjs';
+import { serveGaiaField } from '../gaia-field.mjs';
 import { servePreview } from '../spherex-preview.mjs';
 import { serveObservations } from '../spherex-observations.mjs';
 import { createServer } from 'node:http';
@@ -8,6 +11,7 @@ import { serveBarnard } from '../barnard/proxy.mjs';
 import { serveRegion } from '../barnard/region-proxy.mjs';
 
 const assets = new Map([
+  ['/catalog-discovery.js', ['catalog-discovery.js', 'text/javascript']],
   ['/observations.js', ['observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['barnard-timelapse.js', 'text/javascript']],
   ['/', ['index.html', 'text/html']],
@@ -26,6 +30,9 @@ const port = Number(process.env.PORT ?? 5173);
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
+  if (pathname === '/gaia-source' && request.method === 'GET') { await serveGaiaSource(url, response); return; }
+  if (pathname === '/gaia-field' && request.method === 'GET') { await serveGaiaField(url, response); return; }
   if (request.method === 'GET' && pathname === '/spherex-preview') {
     await servePreview(url, response);
     return;

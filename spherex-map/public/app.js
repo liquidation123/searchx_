@@ -2,6 +2,7 @@ import { parseProperties, references } from './sky-data.js';
 import { catalogQuery, search } from './search.js';
 import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
+import { setupCatalogDiscovery } from './catalog-discovery.js';
 
 import { barnardMarker, setupBarnard } from './barnard-timelapse.js';
 
@@ -23,6 +24,7 @@ const blankFrames = new Set([50, 51]);
 const home = references[0];
 const loadedFrames = new Set();
 let viewer, A, layer, selectObservations;
+let showResolvedMarker = () => {};
 let selectedReference;
 let activeFrame = 62;
 let searchRevision = 0;
@@ -53,6 +55,7 @@ function inspect(reference) {
   selectedReference = reference;
   byId('inspector').hidden = !reference;
   byId('story-supplement').hidden = !reference;
+  byId('panel-stages').querySelector('[data-stage=understand]').hidden = !reference || !reviewedQuestions[reference.id];
   resetQuiz();
   setStage('discover');
   byId('sheet-name').textContent = reference?.name || 'Selected object';
@@ -63,17 +66,14 @@ function inspect(reference) {
   if (!reference) return;
   byId('object-fields').closest('details').open = false;
   byId('copy-status').textContent = '';
-  const exhibit = exhibits[reference.id] ?? {
-    type: reference.category ?? 'SKY OBJECT',
-    why: reference.description,
-    url: 'https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/',
-  };
-  byId('object-type').textContent = exhibit.type;
+  const exhibit = exhibits[reference.id];
+  byId('object-type').textContent = exhibit?.type ?? reference.category ?? 'CATALOG SOURCE';
   byId('object-id').textContent = reference.id + '  ·  ' + reference.source;
-  byId('object-why').textContent = exhibit.why;
-  byId('object-learn').href = exhibit.url;
+  byId('object-why').textContent = exhibit?.why ?? '';
+  byId('story-supplement').hidden = !exhibit;
+  if (exhibit) byId('object-learn').href = exhibit.url;
   byId('object-name').textContent = reference.name;
-  byId('object-description').textContent = reference.description;
+  byId('object-description').textContent = reference.description || 'Position resolved by CDS Sesame; classification not available.';
   byId('object-catalog').textContent = reference.source + ' · ' + reference.id;
   byId('object-position').textContent = positionText(reference.ra, reference.dec);
   byId('object-source').href = reference.url ??
@@ -227,11 +227,24 @@ function choose(entry) {
   if(entry.type==='object') {
     goToReference(entry);
     target.value=entry.name;
-    if (refresh) { inspect(null); void selectObservations(entry.ra, entry.dec); }
     return;
   }
   pointAt(...entry.position); rememberTarget(...entry.position,'coordinates'); inspect(null);
   if (refresh) void selectObservations(...entry.position);
+}
+async function resolveGaia(id) {
+  const revision=++searchRevision;
+  showNavigationStatus('Looking up Gaia DR3 source…'); dismiss();
+  try {
+    const response=await fetch('/gaia-source?id='+encodeURIComponent(id),{signal:AbortSignal.timeout(10000)});
+    const result=await response.json();
+    if(revision!==searchRevision)return;
+    if(result.status==='not_found'){showNavigationStatus('Gaia DR3 source not found. Check the identifier.');return;}
+    if(!response.ok||result.status!=='found')throw new Error('Gaia unavailable');
+    const reference=result.source;
+    pointAt(reference.ra,reference.dec,.25);rememberTarget(reference.ra,reference.dec,reference.id,.25);
+    showResolvedMarker(reference);inspect(reference);showNavigationStatus('Source from ESA Gaia DR3.');
+  }catch{if(revision===searchRevision)showNavigationStatus('Gaia archive is unavailable. Try again later.');}
 }
 function resolveExternal(query, useAi = true) {
   if (!viewer || !A) {
@@ -242,22 +255,17 @@ function resolveExternal(query, useAi = true) {
   showNavigationStatus('Searching the sky catalog…');
   dismiss();
 
-  function lookup(name) {
-    return new Promise(resolve => {
-      const timeout = setTimeout(() => resolve(null), 3500);
-      A.Sesame.resolveAstronomicalName(name, position => {
-        clearTimeout(timeout);
-        resolve(position);
-      }, () => {
-        clearTimeout(timeout);
-        resolve(null);
-      });
-    });
+  async function lookup(name) {
+    const response=await fetch('/name-resolve?name='+encodeURIComponent(name),{signal:AbortSignal.timeout(9000)});
+    if(!response.ok) throw new Error('Resolver unavailable');
+    const result=await response.json();
+    return result.status==='found' ? result.source : null;
   }
 
   async function run() {
     let name = query;
-    let position = await lookup(name);
+    let position;
+    try { position = await lookup(name); } catch { if (revision === searchRevision) showNavigationStatus('Name resolver unavailable. Try again later or enter coordinates.'); return; }
     if (revision !== searchRevision) return;
     if (!position && useAi) {
       showNavigationStatus('AI is interpreting your search…');
@@ -278,7 +286,7 @@ function resolveExternal(query, useAi = true) {
         name = result.target;
         position = await lookup(name);
       } catch {
-        if (revision === searchRevision) showNavigationStatus('AI search is unavailable. Try an object name, catalog ID, or RA and Dec.');
+        if (revision === searchRevision) showNavigationStatus('No catalog position found for ' + name + '. AI search is unavailable; try an object name, catalog ID, or RA and Dec.');
         return;
       }
     }
@@ -292,11 +300,15 @@ function resolveExternal(query, useAi = true) {
     if (!byId('barnard-panel').hidden) byId('barnard-close').click();
     pointAt(ra, dec);
     rememberTarget(ra, dec, name);
-    inspect(null);
+    const resolved = { id: position.id || name, name, ra, dec, source: 'CDS Sesame',
+      category: position.category || 'CATALOG SOURCE',
+      description: position.category ? 'Catalog classification: '+position.category+'.' : 'Catalog name resolved to this sky position; classification is unavailable.',
+      url: 'https://simbad.cfa.harvard.edu/simbad/sim-id?Ident=' + encodeURIComponent(position.id || name) };
+    showResolvedMarker(resolved);
+    inspect(resolved);
     byId('lesson').hidden = true;
     syncState();
-    showNavigationStatus('Found ' + name + ' in the CDS sky catalog.');
-    if (refresh) void selectObservations(ra, dec);
+    showNavigationStatus('Resolved ' + name + ' with CDS Sesame.');
   }
   void run();
 }
@@ -309,6 +321,8 @@ target.addEventListener('keydown',event=>{
 });
 byId('navigation').addEventListener('submit',event=>{
   event.preventDefault(); const query=target.value.trim(); if(!query){render();return;}
+  const gaia=query.match(/^Gaia\s+(?:DR3\s+)?(\d{16,20})$/i); if(gaia){void resolveGaia(gaia[1]);return;}
+  if(/^(?:Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Europa|Ceres|Halley(?:'s)? comet)$/i.test(query)){showNavigationStatus('Moving objects need a date-specific ephemeris; this sky map does not locate them yet.');dismiss();return;}
   const result=search(query); if(result.error){showNavigationStatus(result.error);render();return;}
   if(active>=0 && !popup.hidden){choose(matches[active]);return;}
   if(result.exact){choose(result.exact);return;}
@@ -328,10 +342,21 @@ target.addEventListener('blur',()=>setTimeout(()=>{if(!byId('navigation').contai
 byId('close-lesson').addEventListener('click',()=>{byId('lesson').hidden=true;resetQuiz();target.focus({preventScroll:true});dismiss();});
 
 
-const questions = [
-  {question:'What kind of light does SPHEREx observe?', choices:['Infrared light','Only visible light','Sound waves'], correct:0, feedback:'SPHEREx observes infrared light across many wavelengths.'},
-  {question:'What do observation dates tell you?', choices:['When the exposure was taken','The exact age of every object','That a change was verified'], correct:0, feedback:'A date identifies an exposure. Comparing dates alone does not establish a verified change.'}
-];
+const reviewedQuestions = {
+  'M 42': [
+    {question:'What is the Orion Nebula?',choices:['A region where stars form','A single nearby planet','A radio burst'],correct:0,feedback:'Its gas and dust make it a stellar nursery.'},
+    {question:'What can a dated SPHEREx exposure establish?',choices:['When this field was observed','That a star was born on that date','That every bright spot changed'],correct:0,feedback:'The date identifies an exposure; a physical change needs comparable measurements.'}
+  ],
+  'Barnard 33': [
+    {question:'Why does the Horsehead appear dark in optical light?',choices:['Dust blocks background light','It contains no matter','It is outside the Galaxy'],correct:0,feedback:'Its dust is silhouetted against brighter gas behind it.'},
+    {question:'What can infrared imagery help reveal?',choices:['Structure obscured by dust','The exact age of every star','A verified change from one frame'],correct:0,feedback:'Infrared views can reveal different structure, but a single image cannot verify change.'}
+  ],
+  'M 31': [
+    {question:'What is Andromeda?',choices:['A galaxy with many stars','One star','One SPHEREx detector'],correct:0,feedback:'Andromeda is a nearby spiral galaxy.'},
+    {question:'What does an exposure date describe?',choices:['When the image was acquired','The age of the galaxy','A confirmed new object'],correct:0,feedback:'Dates describe observations, not the galaxy’s age or a discovery.'}
+  ]
+};
+let questions = [];
 let quizIndex = 0;
 function resetQuiz() { byId('quiz').hidden=true; byId('quiz-complete').hidden=true; byId('explore-another').hidden=true; document.querySelector('main').classList.remove('quiz-open'); quizIndex=0; }
 function showQuestion() {
@@ -349,13 +374,15 @@ byId('quiz-start').addEventListener('click',()=>setStage(document.querySelector(
 byId('quiz-back').addEventListener('click',()=>setStage('observe'));
 byId('quiz-next').addEventListener('click',()=>{if(quizIndex+1<questions.length){quizIndex++;showQuestion();}else{byId('quiz-answers').replaceChildren();byId('quiz-heading').textContent='Well explored';byId('quiz-progress').textContent='COMPLETE';byId('quiz-feedback').textContent='';byId('quiz-next').hidden=true;byId('quiz-complete').hidden=false;byId('explore-another').hidden=false;}});
 function setStage(stage) {
+  if(stage==='understand' && !reviewedQuestions[selectedReference?.id]) return;
   const main=document.querySelector('main'); main.dataset.stage=stage;
+  if(stage==='understand') questions=reviewedQuestions[selectedReference.id];
   byId('quiz').hidden=stage!=='understand';
   if(stage==='understand' && !byId('quiz-complete').hidden) resetQuiz();
   if(stage==='understand' && byId('quiz-answers').childElementCount===0) {quizIndex=0;showQuestion();}
   for(const button of byId('panel-stages').querySelectorAll('button')) button.setAttribute('aria-current',button.dataset.stage===stage?'step':'false');
   byId('quiz-start').innerHTML=stage==='discover'?'Observe <span aria-hidden="true">→</span>':'Understand <span aria-hidden="true">→</span>';
-  byId('story-action').hidden=stage==='understand';
+  byId('story-action').hidden=stage==='understand' || (stage==='observe' && !reviewedQuestions[selectedReference?.id]);
 }
 for(const button of byId('panel-stages').querySelectorAll('button')) button.addEventListener('click',()=>setStage(button.dataset.stage));
 byId('explore-another').addEventListener('click',()=>{byId('panel-close').click();target.focus();render();});
@@ -363,7 +390,8 @@ byId('panel-close').addEventListener('click',()=>{selectObservations?.close(); i
 const storyObserver = new MutationObserver(()=>{
   const visible=['inspector','lesson','observation-panel','barnard-panel'].some(id=>!byId(id).hidden);
   document.querySelector('main').classList.toggle('story-open',visible);
-  byId('story-action').hidden=!visible || document.querySelector('main').dataset.stage==='understand';
+  byId('story-action').hidden=!visible || document.querySelector('main').dataset.stage==='understand' ||
+    (document.querySelector('main').dataset.stage==='observe' && !reviewedQuestions[selectedReference?.id]);
 });
 for(const id of ['inspector','lesson','observation-panel','barnard-panel']) storyObserver.observe(byId(id),{attributes:true,attributeFilter:['hidden']});
 
@@ -450,6 +478,19 @@ async function start() {
       requestAnimationFrame(positionPins);
     }
     positionPins();
+    showResolvedMarker = reference => {
+      const previous = pins.find(item => item.pin.dataset.resolved === 'true');
+      if (previous) { previous.pin.remove(); pins.splice(pins.indexOf(previous), 1); }
+      const pin = document.createElement('button'); pin.type='button'; pin.className='map-pin';
+      pin.dataset.reference=reference.id; pin.dataset.resolved='true';
+      pin.setAttribute('aria-label', reference.name); pin.setAttribute('aria-controls','inspector');
+      pin.addEventListener('click', () => inspect(reference));
+      const label=document.createElement('span');label.textContent=reference.name;pin.append(label);
+      byId('map-pins').append(pin); pins.push({pin,reference});
+    };
+    setupCatalogDiscovery(viewer, A, reference => {
+      showResolvedMarker(reference); inspect(reference);
+    }, message => { byId('catalog-status').textContent=message; byId('catalog-status').hidden=!message; });
     for (const reference of references) {
       const button = document.createElement('button');
       button.type = 'button';

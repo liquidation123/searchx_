@@ -22,6 +22,8 @@ test('region selection keeps the last decoded image and metadata when a preview 
         removeAttribute: key => attrs.delete(key),
         getBoundingClientRect: () => ({ left: 0, top: 0 }),
         closest: () => null,
+        replaceChildren() {}, append() {},
+        querySelector: () => element('observation-heading-span'),
         click: () => target.dispatchEvent(new Event('click')),
       });
       elements.set(id, target);
@@ -34,13 +36,13 @@ test('region selection keeps the last decoded image and metadata when a preview 
     : String(url).startsWith('/spherex-preview')
     ? new Response('preview', { headers: { 'X-SPHEREx-Stretch': '0,1' } })
     : Response.json({ frames: (empty ? [] : [1, 2, 3]).map(i => ({
-      observedAt: '2025-09-0' + i + 'T01:02:03Z', detector: 'SPHEREx-D2', release: 'DR1',
+      observedAt: '2025-09-0' + i + 'T01:02:03Z', mjd: 60919 + i, detector: 'SPHEREx-D2', release: 'DR1',
       sourceUrl: 'https://irsa.ipac.caltech.edu/frame' + i,
       cutoutUrl: 'https://irsa.ipac.caltech.edu/frame' + i + '?center=85,-2',
     })) }));
   const oldDocument = globalThis.document;
   const oldImage = globalThis.Image;
-  globalThis.document = { getElementById: element, createElement: () => new EventTarget() };
+  globalThis.document = { getElementById: element, createElement: () => Object.assign(new EventTarget(), { append() {} }) };
   globalThis.Image = class {
     async decode() { if (this.src.includes('frame2')) throw Error('broken image'); }
   };

@@ -37,7 +37,7 @@
       </details>
     </div></details>
     <div class="map-controls" role="group" aria-label="Map navigation"><button type="button" id="home" disabled title="Recenter">⌖ <span>Recenter</span></button><button type="button" id="map-zoom-in" aria-label="Zoom in">+</button><button type="button" id="map-zoom-out" aria-label="Zoom out">−</button></div>
-    <p id="navigation-status" role="status" hidden></p>
+    <p id="navigation-status" role="status" hidden></p><p id="catalog-status" role="status" hidden></p>
   </div>
   <div id="notice" role="status">Starting the sky map…</div>
   <aside id="story-sidebar" aria-label="Discovery panel"><button id="sheet-toggle" type="button" aria-expanded="false"><span id="sheet-name">Selected object</span> <span id="sheet-label">Expand ↑</span></button><header id="panel-header"><button id="panel-collapse" type="button" aria-label="Collapse panel">−</button><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Understand</button></nav><div id="panel-body"><section id="inspector" class="story-section" aria-label="Object details" hidden>
@@ -55,9 +55,9 @@
   <section id="observation-panel" class="story-section" aria-labelledby="observation-heading" hidden>
     <button id="observation-close" class="section-close" type="button" aria-label="Close SPHEREx observations" hidden>×</button>
     <h2 id="observation-heading">A closer look <span> / SPHEREx DR1 and QR3</span></h2>
-    <p>Frames use one detector. Wavelength and image orientation can vary between exposures.</p>
+    <p id="observation-frame-note">Frames use one detector. Wavelength and image orientation can vary between exposures.</p>
     <p id="observation-position"></p>
-    <p id="observation-status" role="status"></p>
+    <p id="observation-status" role="status"></p><dl id="radio-fields" hidden></dl><a id="radio-source" target="_blank" rel="noopener noreferrer" hidden>Open CHIME/FRB Catalog 2 event ↗</a><details id="observation-available-dates" hidden><summary>Available observation dates and FITS files</summary><ul id="observation-date-list"></ul></details>
     <p id="observation-placeholder" role="status" hidden></p>
     <div id="observation-viewport" hidden>
       <img id="observation-image" alt="SPHEREx infrared exposure at the selected sky position" hidden>
@@ -83,7 +83,7 @@
       <button id="object-observations" type="button" hidden>View SPHEREx observations</button>
       <details class="evidence"><summary>Scientific reference <span aria-hidden="true">+</span></summary>
         <p>Catalog position shown for context. This is not a SIEVE-verified detection.</p>
-        <dl id="object-fields"><dt>Catalog reference</dt><dd id="object-catalog"></dd><dt>Sky position · ICRS</dt><dd id="object-position"></dd></dl>
+        <dl id="object-fields"><dt>Catalog reference</dt><dd id="object-catalog"></dd><dt id="object-frame">Sky position · ICRS</dt><dd id="object-position"></dd></dl>
         <button id="copy-position" type="button">Copy sky position</button><span id="copy-status" role="status" aria-live="polite"></span><br><a id="object-source" target="_blank" rel="noopener noreferrer">Open catalog ↗</a>
       </details>
 </section>  <section id="barnard-panel" class="story-section" aria-label="Sky time-lapse" hidden>

@@ -64,6 +64,10 @@ export function setupObservations(viewer, A, closeInspector) {
     imageStatus.hidden = true;
     byId('observation-alternative').hidden = true;
     byId('observation-fits-fallback').hidden = true;
+    byId('observation-available-dates').hidden = true;
+    byId('observation-date-list').replaceChildren();
+    byId('radio-fields').hidden = true;
+    byId('radio-source').hidden = true;
   }
   const overlay = A.graphicOverlay({ name: 'SPHEREx observation position', color: '#8eeade', lineWidth: 2 });
   viewer.addOverlay(overlay);
@@ -200,6 +204,8 @@ export function setupObservations(viewer, A, closeInspector) {
     request = current;
     selected = [ra, dec];
     resetPreview();
+    byId('observation-heading').querySelector('span').textContent = ' / SPHEREx DR1';
+    byId('observation-frame-note').hidden = false;
     frames = [];
     stop();
     panel.hidden = false;
@@ -216,6 +222,17 @@ export function setupObservations(viewer, A, closeInspector) {
       const results = await response.json();
       if (current.signal.aborted) return;
       frames = results.frames;
+      const dateList = byId('observation-date-list');
+      dateList.replaceChildren();
+      for (const frame of frames) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = frame.cutoutUrl;
+        link.target = '_blank'; link.rel = 'noopener noreferrer';
+        link.textContent = new Date((frame.mjd - 40587) * 86400000).toISOString().slice(0, 10) + ' · ' + frame.detector + ' · FITS ↗';
+        item.append(link); dateList.append(item);
+      }
+      byId('observation-available-dates').hidden = frames.length === 0;
       if (!frames.length) {
         status.textContent = results.truncated ? 'IRSA returned partial coverage. Try again.' :
           'No matching SPHEREx wide-survey exposures found at this position.';
@@ -255,6 +272,41 @@ export function setupObservations(viewer, A, closeInspector) {
       byId('observation-alternative').hidden = false;
     }
   }
+
+  select.radio = reference => {
+    setSelecting(false);
+    request?.abort();
+    resetPreview();
+    stop();
+    overlay.removeAll();
+    frames = [];
+    selected = undefined;
+    player.hidden = true;
+    panel.hidden = false;
+    byId('observation-retry').hidden = true;
+    byId('observation-heading').querySelector('span').textContent = ' / CHIME/FRB Catalog 2';
+    byId('observation-frame-note').hidden = true;
+    position.textContent = reference.id + ' · published radio transient';
+    status.textContent = 'These are CHIME radio measurements. An optical or SPHEREx image at this position is not an image of the burst.';
+    const fields = byId('radio-fields');
+    fields.replaceChildren();
+    const add = (label, value) => {
+      if (value === null || value === undefined || value === '') return;
+      const term = document.createElement('dt'), detail = document.createElement('dd');
+      term.textContent = label; detail.textContent = value; fields.append(term, detail);
+    };
+    const radio = reference.radio;
+    add('CHIME event ID', radio.eventId);
+    add('Arrival at 400 MHz · UTC', radio.mjd === null ? null : new Date((radio.mjd - 40587) * 86400000).toISOString());
+    add('Dispersion measure', radio.dm === null ? null : radio.dm.toFixed(2) + ' pc cm⁻³');
+    add('Localization · J2000', `RA ${reference.ra.toFixed(4)}°${radio.raError === null ? '' : ' ±' + radio.raError.toFixed(4) + '°'} · Dec ${reference.dec.toFixed(4)}°${radio.decError === null ? '' : ' ±' + radio.decError.toFixed(4) + '°'}`);
+    add('Published sub-bursts', String(radio.subBursts));
+    if (radio.excluded) add('Catalog note', 'Flagged as excluded from population inference.');
+    add('Localization note', radio.notes);
+    fields.hidden = false;
+    byId('radio-source').href = reference.url;
+    byId('radio-source').hidden = false;
+  };
 
   function coordinatesAt(x, y) {
     const rect = sky.getBoundingClientRect();

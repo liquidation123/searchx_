@@ -25,8 +25,9 @@ export function setupCatalogDiscovery(viewer, A, onSource, onStatus = () => {}) 
     const fov = viewer.getFoV()[0];
     if (fov > .65) { ++revision; fieldRequest?.abort(); clear(); lastQuery = ''; onStatus(''); return; }
     const [ra, dec] = viewer.getRaDec();
-    const radius = Math.min(.18, Math.max(.015, fov * .42));
-    const key = [ra.toFixed(2), dec.toFixed(2), radius.toFixed(2)].join(':');
+    const limit = fov > .3 ? 100 : fov > .12 ? 250 : 500;
+    const radius = Math.min(.35, Math.max(.005, fov * .55));
+    const key = [ra.toFixed(2), dec.toFixed(2), radius.toFixed(3), limit].join(':');
     if (key === lastQuery) return;
     lastQuery = key;
     const current = ++revision;
@@ -40,7 +41,7 @@ export function setupCatalogDiscovery(viewer, A, onSource, onStatus = () => {}) 
       if (count) onStatus(`${count} catalog sources shown`);
       else if (gaiaCount !== null && simbadCount !== null) onStatus(failures ? 'Catalog services unavailable in this field.' : 'No catalog sources in this field.');
     };
-    const params = new URLSearchParams({ ra: ra.toFixed(6), dec: dec.toFixed(6), radius: Math.min(radius, .08).toFixed(4) });
+    const params = new URLSearchParams({ ra: ra.toFixed(6), dec: dec.toFixed(6), radius: radius.toFixed(4), limit });
     const controller = new AbortController();
     fieldRequest = controller;
     fetch('/gaia-field?' + params, { signal: controller.signal }).then(async response => {
@@ -50,28 +51,40 @@ export function setupCatalogDiscovery(viewer, A, onSource, onStatus = () => {}) 
       if (current !== revision) return;
       const gaia = A.catalog({ name: 'Nearby Gaia DR3', color: '#c8a274', sourceSize: 6,
         onClick: source => select(source, 'Gaia DR3') });
-      gaia.addSources(result.sources.map(source => A.source(source.ra, source.dec, { Source: source.id, magnitude: source.magnitude })));
+      const occupied = new Set();
+      const sky = document.getElementById('sky');
+      const cell = sky.clientWidth <= 600 ? 20 : Math.max(10, Math.min(16, fov * 25));
+      const sources = result.sources.filter(source => {
+        const point = viewer.world2pix(source.ra, source.dec);
+        if (!point || !point.every(Number.isFinite) || point[0] < 0 || point[0] > sky.clientWidth || point[1] < 0 || point[1] > sky.clientHeight) return false;
+        const key = `${Math.floor(point[0] / cell)}:${Math.floor(point[1] / cell)}`;
+        if (occupied.has(key)) return false;
+        occupied.add(key);
+        return true;
+      });
+      gaia.addSources(sources.map(source => A.source(source.ra, source.dec, { Source: source.id, magnitude: source.magnitude })));
       viewer.addCatalog(gaia);
       catalogs.push(gaia);
-      gaiaCount = result.sources.length;
+      gaiaCount = sources.length;
       report();
     }).catch(() => { if (current === revision) { gaiaCount = 0; failures++; report(); } });
     const add = (catalog, sources, label) => {
       if (current !== revision) { viewer.removeOverlay(catalog); return; }
-      catalogs.push(catalog);
       simbadCount = sources.length;
       report();
     };
     try {
-      const simbad = A.catalogFromSimbad(target, radius,
+      const simbad = A.catalogFromSimbad(target, Math.min(radius, .18),
         { name: 'Nearby SIMBAD', limit: 50, color: '#7fcbd4', sourceSize: 8, onClick: source => select(source, 'SIMBAD') },
         sources => add(simbad, sources, 'SIMBAD'), () => { if (current === revision) { simbadCount = 0; failures++; report(); } });
       viewer.addCatalog(simbad);
-    } catch { if (current === revision) onStatus('Catalog sources unavailable.'); }
+      catalogs.push(simbad);
+    } catch { if (current === revision) { simbadCount = 0; failures++; report(); } }
   }
   const schedule = () => { clearTimeout(timer); timer = setTimeout(refresh, 450); };
   viewer.on('zoomChanged', schedule);
   viewer.on('positionChanged', schedule);
+  addEventListener('resize', () => { lastQuery = ''; schedule(); });
   schedule();
   return { refresh, clear };
 }

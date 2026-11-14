@@ -1,6 +1,7 @@
 import { serveNameResolve } from './name-resolve.mjs';
 import { serveGaiaSource } from './gaia-source.mjs';
 import { serveGaiaField } from './gaia-field.mjs';
+import { serveChimeEvent } from './chime-event.mjs';
 import { serveAiSearch } from './ai-search.mjs';
 import { servePreview } from './spherex-preview.mjs';
 import { createServer } from 'node:http';
@@ -39,6 +40,7 @@ export default async function handler(request, response) {
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
   if (pathname === '/gaia-source' && request.method === 'GET') { await serveGaiaSource(url, response); return; }
   if (pathname === '/gaia-field' && request.method === 'GET') { await serveGaiaField(url, response); return; }
+  if (pathname === '/chime-event' && request.method === 'GET') { await serveChimeEvent(url, response); return; }
   if (pathname === '/ai-search') {
     await serveAiSearch(request, response);
     return;

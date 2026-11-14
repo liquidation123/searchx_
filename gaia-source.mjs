@@ -2,7 +2,7 @@ const endpoint = 'https://gea.esac.esa.int/tap-server/tap/sync';
 export async function serveGaiaSource(url, response) {
   const id = url.searchParams.get('id') || '';
   const send = (code, body) => response.writeHead(code, { 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':code===200?'public, max-age=300':'no-store' }).end(JSON.stringify(body));
-  if (!/^\d{16,20}$/.test(id)) return send(400, { status:'invalid_id' });
+  if (!/^\d{1,19}$/.test(id)) return send(400, { status:'invalid_id' });
   const query = `SELECT TOP 1 source_id, ra, dec, phot_g_mean_mag FROM gaiadr3.gaia_source WHERE source_id = ${id}`;
   try {
     const upstream = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},

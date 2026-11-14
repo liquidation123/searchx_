@@ -343,3 +343,12 @@ main.panel-collapsed #panel-stages,main.panel-collapsed #panel-body,main.panel-c
 #observation-available-dates{font-size:.73rem;color:#52657a;margin:10px 0}
 #observation-available-dates summary{cursor:pointer;color:#1762a9}
 #observation-date-list{padding-left:18px;line-height:1.75}
+#radio-fields{display:grid;grid-template-columns:1fr 1.4fr;gap:6px 12px;font-size:.76rem;margin:14px 0;line-height:1.45}
+#radio-fields dt{color:#61758c}#radio-fields dd{margin:0;overflow-wrap:anywhere}
+#radio-fields[hidden],#radio-source[hidden]{display:none}
+@media(max-width:850px){
+  .coordinates{bottom:110px;right:10px;max-width:calc(100vw - 20px);flex-wrap:wrap;justify-content:flex-end}
+  #catalog-status{right:10px;bottom:150px}
+  main.story-open #catalog-status{display:none}
+  main.story-open #navigation-status{display:none}
+}

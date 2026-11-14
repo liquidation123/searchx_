@@ -76,9 +76,13 @@ function inspect(reference) {
   byId('object-description').textContent = reference.description || 'Position resolved by CDS Sesame; classification not available.';
   byId('object-catalog').textContent = reference.source + ' · ' + reference.id;
   byId('object-position').textContent = positionText(reference.ra, reference.dec);
+  byId('object-frame').textContent = 'Sky position · ' + (reference.radio ? 'J2000' : 'ICRS');
   byId('object-source').href = reference.url ??
     'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=' + encodeURIComponent(reference.id);
-  if (selectObservations) void selectObservations(reference.ra, reference.dec);
+  if (selectObservations) {
+    if (reference.radio) selectObservations.radio(reference);
+    else void selectObservations(reference.ra, reference.dec);
+  }
 }
 
 function rememberTarget(ra, dec, label, fov = viewer.getFoV()[0]) {
@@ -230,7 +234,6 @@ function choose(entry) {
     return;
   }
   pointAt(...entry.position); rememberTarget(...entry.position,'coordinates'); inspect(null);
-  if (refresh) void selectObservations(...entry.position);
 }
 async function resolveGaia(id) {
   const revision=++searchRevision;
@@ -245,6 +248,22 @@ async function resolveGaia(id) {
     pointAt(reference.ra,reference.dec,.25);rememberTarget(reference.ra,reference.dec,reference.id,.25);
     showResolvedMarker(reference);inspect(reference);showNavigationStatus('Source from ESA Gaia DR3.');
   }catch{if(revision===searchRevision)showNavigationStatus('Gaia archive is unavailable. Try again later.');}
+}
+async function resolveChime(id) {
+  const revision = ++searchRevision;
+  showNavigationStatus('Looking up CHIME/FRB Catalog 2…'); dismiss();
+  try {
+    const response = await fetch('/chime-event?id=' + encodeURIComponent(id), { signal: AbortSignal.timeout(10000) });
+    const result = await response.json();
+    if (revision !== searchRevision) return;
+    if (result.status === 'not_found') { showNavigationStatus('Event not found in CHIME/FRB Catalog 2.'); return; }
+    if (!response.ok || result.status !== 'found') throw new Error('CHIME unavailable');
+    const reference = result.source;
+    pointAt(reference.ra, reference.dec, Math.max(.2, 4 * Math.max(reference.radio.raError || 0, reference.radio.decError || 0)));
+    rememberTarget(reference.ra, reference.dec, reference.id);
+    showResolvedMarker(reference); inspect(reference);
+    showNavigationStatus('Published CHIME/FRB Catalog 2 event.');
+  } catch { if (revision === searchRevision) showNavigationStatus('CHIME/FRB Catalog 2 is unavailable. Try again later.'); }
 }
 function resolveExternal(query, useAi = true) {
   if (!viewer || !A) {
@@ -321,7 +340,8 @@ target.addEventListener('keydown',event=>{
 });
 byId('navigation').addEventListener('submit',event=>{
   event.preventDefault(); const query=target.value.trim(); if(!query){render();return;}
-  const gaia=query.match(/^Gaia\s+(?:DR3\s+)?(\d{16,20})$/i); if(gaia){void resolveGaia(gaia[1]);return;}
+  const chime=query.match(/^(FRB\d{8}[A-Z])$/i); if(chime){void resolveChime(chime[1].toUpperCase());return;}
+  const gaia=query.match(/^Gaia\s+(?:DR3\s+)?(\d{1,19})$/i); if(gaia){void resolveGaia(gaia[1]);return;}
   if(/^(?:Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Europa|Ceres|Halley(?:'s)? comet)$/i.test(query)){showNavigationStatus('Moving objects need a date-specific ephemeris; this sky map does not locate them yet.');dismiss();return;}
   const result=search(query); if(result.error){showNavigationStatus(result.error);render();return;}
   if(active>=0 && !popup.hidden){choose(matches[active]);return;}
@@ -544,7 +564,7 @@ byId('sheet-toggle').addEventListener('click', event => {
 const panel=byId('story-sidebar'), main=document.querySelector('main');
 let panelWidth=340, floating=false, collapsed=false;
 function positionPanel(x,y) { const maxX=Math.max(0,innerWidth-panelWidth), maxY=Math.max(0,innerHeight-90); panel.style.left=Math.max(0,Math.min(x,maxX))+'px'; panel.style.top=Math.max(0,Math.min(y,maxY))+'px'; }
-function applyWidth(value) { panelWidth=Math.max(300,Math.min(440,value));panel.style.width=panelWidth+'px';panel.style.setProperty('--panel-width',panelWidth+'px');byId('panel-resize').setAttribute('aria-valuenow',String(panelWidth));if(floating)positionPanel(panel.offsetLeft,panel.offsetTop); }
+function applyWidth(value) { panelWidth=Math.max(300,Math.min(440,value));main.style.setProperty('--panel-width',panelWidth+'px');byId('panel-resize').setAttribute('aria-valuenow',String(panelWidth));if(floating)positionPanel(panel.offsetLeft,panel.offsetTop); }
 function dock() { floating=false;main.classList.remove('panel-floating');panel.style.left='';panel.style.top=''; }
 byId('panel-header').addEventListener('pointerdown',event=>{if(event.target.closest('button')||matchMedia('(max-width:850px)').matches)return;const startX=event.clientX,startY=event.clientY,rect=panel.getBoundingClientRect();let moved=false;const move=e=>{if(!moved&&Math.hypot(e.clientX-startX,e.clientY-startY)<6)return;moved=true;floating=true;main.classList.add('panel-floating');positionPanel(rect.left+e.clientX-startX,rect.top+e.clientY-startY);};const up=e=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);if(moved&&e.clientX<45)dock();};addEventListener('pointermove',move);addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('pointerdown',event=>{if(matchMedia('(max-width:850px)').matches)return;event.preventDefault();event.target.setPointerCapture(event.pointerId);const width=panelWidth,x=event.clientX;const move=e=>applyWidth(width+e.clientX-x);const up=()=>{event.target.removeEventListener('pointermove',move);event.target.removeEventListener('pointerup',up);};event.target.addEventListener('pointermove',move);event.target.addEventListener('pointerup',up,{once:true});});

@@ -11,6 +11,10 @@ export function setupObservations(viewer, A, closeInspector) {
   const status = byId('observation-status');
   const player = byId('observation-player');
   const slider = byId('observation-frame');
+  const difference = byId('observation-difference');
+  const differenceStatus = byId('observation-difference-status');
+  let filtered;
+  let differenceRequest;
   const play = byId('observation-play');
   const cutout = byId('observation-source');
   const image = byId('observation-image');
@@ -35,6 +39,11 @@ export function setupObservations(viewer, A, closeInspector) {
   zoomIn.addEventListener('click', () => setZoom(zoom * 2));
 
   function resetPreview() {
+    differenceRequest?.abort();
+    filtered = undefined;
+    difference.checked = false;
+    difference.disabled = true;
+    differenceStatus.textContent = '';
     stretch = undefined;
     viewport.hidden = true;
     setZoom(1);
@@ -67,8 +76,9 @@ export function setupObservations(viewer, A, closeInspector) {
     return '/spherex-preview?' + query;
   }
 
-  function loadPreview(frame) {
-    const url = previewUrl(frame);
+  function loadPreview(frame, index) {
+    const residual = difference.checked && filtered?.[index];
+    const url = residual ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(residual) : previewUrl(frame);
     if (!previewCache.has(url)) {
       const preload = new Image();
       preload.src = url;
@@ -91,7 +101,7 @@ export function setupObservations(viewer, A, closeInspector) {
     if (!frame) return false;
     const revision = ++previewRevision;
     try {
-      const src = await loadPreview(frame);
+      const src = await loadPreview(frame, index);
       if (revision !== previewRevision) return false;
       failedFrame = undefined;
       byId('observation-retry').hidden = true;
@@ -122,11 +132,52 @@ export function setupObservations(viewer, A, closeInspector) {
       ' UTC · ' + frame.detector + ' · ' + frame.release;
     cutout.href = frame.sourceUrl;
     status.textContent = sequenceStatus;
-    if (frames.length > 1) void loadPreview(frames[(index + 1) % frames.length]).catch(() => {});
+    if (filtered) {
+      difference.disabled = !difference.checked && !filtered[index];
+      differenceStatus.textContent = difference.checked
+        ? (filtered[index] ? 'Changes relative to early frames' : 'Original exposure. This frame has no compatible reference.')
+        : (filtered[index] ? '' : 'Static source subtraction is unavailable for this exposure.');
+    }
+    const next = (index + 1) % frames.length;
+    if (frames.length > 1) void loadPreview(frames[next], next).catch(() => {});
     return true;
   }
 
   let sequenceStatus = '';
+  async function prepareDifferences(ra, dec) {
+    if (frames.length < 3) {
+      differenceStatus.textContent = 'Static source subtraction needs at least three exposures.';
+      return;
+    }
+    const current = new AbortController();
+    differenceRequest = current;
+    differenceStatus.textContent = 'Checking exposure compatibility for static source subtraction…';
+    const query = new URLSearchParams({ra, dec, view: 'difference'});
+    for (const frame of frames) query.append('product', new URL(frame.cutoutUrl).pathname);
+    try {
+      const answer = await fetch('/spherex-preview?' + query, {signal: current.signal});
+      if (!answer.ok) throw new Error('Subtraction unavailable');
+      const result = await answer.json();
+      if (current.signal.aborted) return;
+      filtered = result.images;
+      const available = filtered?.[Number(image.dataset.frame)] && !image.hidden;
+      difference.disabled = !available;
+      differenceStatus.textContent = available ? '' : result.reason ??
+        'Static source subtraction is unavailable for this exposure.';
+    } catch {
+      if (!current.signal.aborted) differenceStatus.textContent = 'Could not check exposure compatibility.';
+    }
+  }
+
+  difference.addEventListener('change', async () => {
+    stop();
+    const timeline = differenceRequest;
+    const shown = showFrame(Number(image.dataset.frame));
+    const revision = previewRevision;
+    if (!await shown && timeline === differenceRequest && revision === previewRevision) {
+      difference.checked = !difference.checked;
+    }
+  });
   async function select(ra, dec, autoplay = false) {
     if (![ra, dec].every(Number.isFinite)) return;
     setSelecting(false);
@@ -182,6 +233,7 @@ export function setupObservations(viewer, A, closeInspector) {
       slider.disabled = play.disabled = frames.length < 2;
       player.hidden = false;
       const shown = await showFrame(reference < frames.length ? reference : 0);
+      if (!current.signal.aborted) void prepareDifferences(ra, dec);
       if (shown && !current.signal.aborted && autoplay && frames.length > 1) play.click();
     } catch {
       if (current.signal.aborted) return;

@@ -1,10 +1,11 @@
 import { spectralProduct } from './spherex-observations.mjs';
+import { calibratedCutout, differenceFrames } from './spherex-difference.mjs';
 
 const archive = 'https://irsa.ipac.caltech.edu';
 const maxBytes = 512 * 1024;
 const fitsBlock = 2880;
 
-export function readScienceImage(bytes) {
+export function readScienceImage(bytes, extensions) {
   let offset = 0;
   while (offset + 80 <= bytes.length) {
     const header = new Map();
@@ -25,9 +26,11 @@ export function readScienceImage(bytes) {
     const bitpix = Number(header.get('BITPIX'));
     const count = axes ? dimensions.reduce((a, b) => a * b, 1) : 0;
     const size = (count + Number(header.get('PCOUNT') ?? 0)) * Number(header.get('GCOUNT') ?? 1) * Math.abs(bitpix) / 8;
-    if (!Number.isSafeInteger(size) || size < 0 || size > maxBytes) throw new Error('FITS extension exceeds preview limit');
+    if (!Number.isSafeInteger(size) || size < 0 || size > (extensions ? 5 * 1024 * 1024 : maxBytes)) throw new Error('FITS extension exceeds limit');
     if (data + size > bytes.length) return null;
-    if (header.get('EXTNAME') === 'IMAGE') {
+    if (extensions) {
+      extensions.set(header.get('EXTNAME'), {header, data: bytes.subarray(data, data + size)});
+    } else if (header.get('EXTNAME') === 'IMAGE') {
       if (axes !== 2 || bitpix !== -32 || !count || dimensions.some(n => !Number.isInteger(n) || n < 1 || n > 256)) {
         throw new Error('Unsupported SPHEREx image format');
       }
@@ -39,6 +42,47 @@ export function readScienceImage(bytes) {
     offset = data + Math.ceil(size / fitsBlock) * fitsBlock;
   }
   return null;
+}
+
+async function serveDifferences(products, ra, dec, response) {
+  const send = (body) => response.writeHead(200, {
+    'Content-Type': 'application/json', 'Cache-Control': 'no-store',
+  }).end(JSON.stringify(body));
+  const frames = [];
+  const deadline = AbortSignal.timeout(9000);
+  for (let i = 0; i < products.length; i += 2) {
+    frames.push(...await Promise.all(products.slice(i, i + 2).map(async product => {
+      const source = new URL(product, archive);
+      source.searchParams.set('center', ra + ',' + dec);
+      source.searchParams.set('size', '0.1');
+      try {
+        const upstream = await fetch(source, {redirect: 'error', signal: deadline});
+        if (!upstream.ok || !upstream.body) return null;
+        const reader = upstream.body.getReader();
+        try {
+          const chunks = [];
+          let size = 0;
+          while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            size += value.length;
+            if (size > 5 * 1024 * 1024) return null;
+            chunks.push(value);
+          }
+          const extensions = new Map();
+          readScienceImage(Buffer.concat(chunks), extensions);
+          return calibratedCutout(extensions, ra, dec);
+        } finally {
+          void reader.cancel().catch(() => {});
+        }
+      } catch {
+        return null;
+      }
+    })));
+  }
+  const result = differenceFrames(frames);
+  if (!result) return send({reason: 'Need two early and one later exposure with matching wavelength coverage and usable calibration.'});
+  send({images: result.frames.map(frame => frame && renderSvg(frame, [0, result.high]).svg)});
 }
 
 function renderSvg({width, height, pixels}, stretch) {
@@ -64,15 +108,20 @@ function renderSvg({width, height, pixels}, stretch) {
 }
 
 export async function servePreview(url, response) {
-  const product = url.searchParams.get('product') ?? '';
+  const products = url.searchParams.getAll('product');
+  const product = products[0] ?? '';
+  const difference = url.searchParams.get('view') === 'difference';
   const raw = ['ra', 'dec'].map(name => url.searchParams.get(name));
   const [ra, dec] = raw.map(Number);
-  if (!spectralProduct.test(product) ||
+  if (!spectralProduct.test(product) || (difference &&
+      (products.length < 3 || products.length > 8 || new Set(products).size !== products.length ||
+       products.some(path => !spectralProduct.test(path)))) ||
       raw.some(value => !value?.trim()) || ![ra, dec].every(Number.isFinite) ||
       ra < 0 || ra >= 360 || dec < -90 || dec > 90) {
     response.writeHead(400).end();
     return;
   }
+  if (difference) return serveDifferences(products, ra, dec, response);
   const source = new URL(product, archive);
   source.searchParams.set('center', ra + ',' + dec);
   source.searchParams.set('size', '0.1');

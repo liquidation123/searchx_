@@ -29,9 +29,11 @@ test('region selection keeps the last decoded image and metadata when a preview 
     return elements.get(id);
   }
   let empty = false;
-  t.mock.method(globalThis, 'fetch', async url => String(url).startsWith('/spherex-preview')
+  t.mock.method(globalThis, 'fetch', async url => String(url).includes('view=difference')
+    ? Response.json({images: ['<svg/>', null, '<svg/>']})
+    : String(url).startsWith('/spherex-preview')
     ? new Response('preview', { headers: { 'X-SPHEREx-Stretch': '0,1' } })
-    : Response.json({ frames: (empty ? [] : [1, 2]).map(i => ({
+    : Response.json({ frames: (empty ? [] : [1, 2, 3]).map(i => ({
       observedAt: '2025-09-0' + i + 'T01:02:03Z', detector: 'SPHEREx-D2', release: 'DR1',
       sourceUrl: 'https://irsa.ipac.caltech.edu/frame' + i,
       cutoutUrl: 'https://irsa.ipac.caltech.edu/frame' + i + '?center=85,-2',
@@ -56,6 +58,21 @@ test('region selection keeps the last decoded image and metadata when a preview 
   const image = element('observation-image');
   const first = image.src;
   assert.match(first, /frame1/);
+  const toggle = element('observation-difference');
+  assert.equal(toggle.checked, false);
+  assert.equal(toggle.disabled, false);
+  toggle.checked = true;
+  toggle.dispatchEvent(new Event('change'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(image.src, /^data:image\/svg/);
+  assert.equal(element('observation-difference-status').textContent, 'Changes relative to early frames');
+  assert.equal(element('observation-date').textContent, '2025-09-01 01:02:03 UTC · SPHEREx-D2 · DR1');
+  assert.equal(element('observation-source').href, 'https://irsa.ipac.caltech.edu/frame1');
+  toggle.checked = false;
+  toggle.dispatchEvent(new Event('change'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(image.src, first);
+  assert.equal(element('observation-date').textContent, '2025-09-01 01:02:03 UTC · SPHEREx-D2 · DR1');
   const slider = element('observation-frame');
   slider.value = 1;
   slider.dispatchEvent(new Event('input'));

@@ -8,6 +8,10 @@ export const references = [
   { id: 'M 45', name: 'Pleiades', ra: 56.75, dec: 24.1167, fov: 3, description: 'An open cluster of young stars also called the Seven Sisters.', source: 'SIMBAD' },
   { id: 'M 51', name: 'Whirlpool Galaxy', ra: 202.4696, dec: 47.1952, fov: 0.8, description: 'A spiral galaxy interacting with a smaller companion.', source: 'SIMBAD' },
   { id: 'M 57', name: 'Ring Nebula', ra: 283.3962, dec: 33.0291, fov: 0.4, description: 'A shell of gas shed by a dying star.', source: 'SIMBAD' },
+  { id: 'eps Ind B', name: 'Epsilon Indi B', ra: 331.09664, dec: -56.80066, fov: 0.25, description: 'A nearby brown dwarf pair. The pin shows an approximate position at epoch 2026.0.', source: 'SIMBAD' },
+  { id: 'WISE J085510.83-071442.5', name: 'WISE 0855', ra: 133.75989, dec: -7.24224, fov: 0.25, description: 'A nearby, very cold brown dwarf. The pin shows an approximate position at epoch 2026.0.', source: 'SIMBAD' },
+  { id: 'RW Aur', name: 'RW Aurigae', ra: 76.95653, dec: 30.40144, fov: 0.25, description: 'A young variable star system in Auriga. Position epoch J2000.0.', source: 'SIMBAD' },
+  { id: 'R Dra', name: 'R Draconis', ra: 248.16667, dec: 66.75472, fov: 0.25, description: 'A long-period variable star in Draco. Position epoch J2000.0.', source: 'SIMBAD' },
 ];
 
 export function parseProperties(raw) {

@@ -139,8 +139,9 @@ export function setupObservations(viewer, A, closeInspector) {
     byId('observation-fits-fallback').hidden = true;
     slider.value = index;
     image.dataset.frame = index;
-    byId('observation-date').textContent = frame.observedAt.slice(0, 19).replace('T', ' ') +
-      ' UTC · ' + frame.detector + ' · ' + frame.release;
+    const time = frame.evidence ? frame.observedAt.slice(0, -1) : frame.observedAt.slice(0, 19);
+    byId('observation-date').textContent = time.replace('T', ' ') +
+      ' UTC · ' + frame.detector + ' · ' + frame.release + (frame.evidence ? ' · ' + frame.id : '');
     cutout.href = frame.sourceUrl;
     status.textContent = sequenceStatus;
     if (filtered) {
@@ -195,14 +196,14 @@ export function setupObservations(viewer, A, closeInspector) {
       difference.checked = !difference.checked;
     }
   });
-  async function select(ra, dec, autoplay = false) {
+  async function select(ra, dec, autoplay = false, candidate) {
     if (![ra, dec].every(Number.isFinite)) return;
     setSelecting(false);
     if (!byId('barnard-panel').hidden) byId('barnard-close').click();
     request?.abort();
     const current = new AbortController();
     request = current;
-    selected = [ra, dec];
+    selected = [ra, dec, false, candidate];
     resetPreview();
     byId('observation-heading').querySelector('span').textContent = ' / SPHEREx DR1';
     byId('observation-frame-note').hidden = false;
@@ -217,11 +218,15 @@ export function setupObservations(viewer, A, closeInspector) {
     byId('observation-retry').hidden = true;
     const query = new URLSearchParams({ ra: ra.toFixed(6), dec: dec.toFixed(6) });
     try {
-      const response = await fetch('/spherex-observations?' + query, { signal: current.signal });
-      if (!response.ok) throw new Error('Archive unavailable');
-      const results = await response.json();
+      let results = {frames: candidate?.frames};
+      if (!candidate) {
+        const response = await fetch('/spherex-observations?' + query, { signal: current.signal });
+        if (!response.ok) throw new Error('Archive unavailable');
+        results = await response.json();
+      }
       if (current.signal.aborted) return;
       frames = results.frames;
+      if (candidate) byId('observation-heading').querySelector('span').textContent = ' / SIEVE demo · QR3';
       const dateList = byId('observation-date-list');
       dateList.replaceChildren();
       for (const frame of frames) {
@@ -240,8 +245,8 @@ export function setupObservations(viewer, A, closeInspector) {
         byId('observation-alternative').hidden = false;
         return;
       }
-      sequenceStatus = frames.length === 1 ? 'One observation date found.' :
-        frames.length + ' observation dates from the same detector.';
+      sequenceStatus = candidate?.summary ?? (frames.length === 1 ? 'One observation date found.' :
+        frames.length + ' observation dates from the same detector.');
       if (results.truncated) sequenceStatus += ' IRSA returned partial archive coverage.';
       status.textContent = sequenceStatus;
       imageStatus.hidden = false;

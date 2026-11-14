@@ -1,6 +1,8 @@
 const width = 57;
 const step = 6.15; // arcseconds per output pixel
 const rad = Math.PI / 180;
+// SOURCE (bit 21) identifies known sources; it does not mark unusable pixels.
+const unusableFlags = ~(1 << 21);
 
 function interpolate(x, y, w, h, sample) {
   const i = Math.floor(x), j = Math.floor(y);
@@ -71,7 +73,7 @@ export function calibratedCutout(extensions, ra, dec) {
     bands.push(spectral(1));
     pixels.push(interpolate(x,y,w,height,(i,j) => {
       const offset = 4*(j*w+i);
-      return flags.data.readInt32BE(offset) ? NaN : image.data.readFloatBE(offset)*scale+zero;
+      return (flags.data.readInt32BE(offset) & unusableFlags) ? NaN : image.data.readFloatBE(offset)*scale+zero;
     }));
   }
   return {width,height:width,pixels,wavelengths,bands,fwhm};
@@ -106,7 +108,13 @@ function blur(frame, target) {
   });
 }
 
-export function differenceFrames(frames) {
+export function differenceFrames(frames, stages) {
+  const usable = frames.map(frame => frame &&
+    frame.pixels.filter(Number.isFinite).length >= .5 * frame.pixels.length ? frame : null);
+  for (let i=0;i<frames.length;i++) {
+    if (frames[i]) stages?.set(i, usable[i] ? 'wavelength matching' : 'valid pixel coverage');
+  }
+  frames = usable;
   // Use the earliest viable group and leave at least one later exposure out of its reference.
   for (let i=0;i<frames.length-2;i++) {
     const group = frames[i] ? [i] : [];
@@ -114,6 +122,7 @@ export function differenceFrames(frames) {
       if (frames[j] && group.every(k=>compatible(frames[k],frames[j]))) group.push(j);
     }
     if(group.length<3) continue;
+    for (const k of group) stages?.set(k, 'coverage after PSF matching');
     const target=Math.max(...group.map(k=>frames[k].fwhm));
     const matched=group.map(k=>blur(frames[k],target));
     const refs=matched.slice(0,Math.min(3,matched.length-1));
@@ -130,6 +139,7 @@ export function differenceFrames(frames) {
     }
     if(!group.slice(refs.length).some(k=>result[k]) || group.slice(0,refs.length).some(k=>!result[k])) continue;
     const positive=result.flatMap(f=>f?.pixels.filter(v=>Number.isFinite(v)&&v>0) ?? []).sort((a,b)=>a-b);
+    for (const k of group) if (result[k]) stages?.set(k, 'ready');
     return {frames:result,high:positive[Math.floor(.99*(positive.length-1))] || 1};
   }
   return null;

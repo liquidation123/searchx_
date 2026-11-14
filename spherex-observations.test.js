@@ -40,7 +40,7 @@ test('region selection keeps the last decoded image and metadata when a preview 
     })) }));
   const oldDocument = globalThis.document;
   const oldImage = globalThis.Image;
-  globalThis.document = { getElementById: element };
+  globalThis.document = { getElementById: element, createElement: () => new EventTarget() };
   globalThis.Image = class {
     async decode() { if (this.src.includes('frame2')) throw Error('broken image'); }
   };

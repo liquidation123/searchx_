@@ -48,15 +48,14 @@ async function serveDifferences(products, ra, dec, response) {
   const send = (body) => response.writeHead(200, {
     'Content-Type': 'application/json', 'Cache-Control': 'no-store',
   }).end(JSON.stringify(body));
-  const frames = [];
-  const deadline = AbortSignal.timeout(9000);
-  for (let i = 0; i < products.length; i += 2) {
-    frames.push(...await Promise.all(products.slice(i, i + 2).map(async product => {
+  const stages = new Map();
+  const frames = await Promise.all(products.map(async (product, index) => {
       const source = new URL(product, archive);
       source.searchParams.set('center', ra + ',' + dec);
       source.searchParams.set('size', '0.1');
+      stages.set(index, 'download or timeout');
       try {
-        const upstream = await fetch(source, {redirect: 'error', signal: deadline});
+        const upstream = await fetch(source, {redirect: 'error', signal: AbortSignal.timeout(15000)});
         if (!upstream.ok || !upstream.body) return null;
         const reader = upstream.body.getReader();
         try {
@@ -66,10 +65,14 @@ async function serveDifferences(products, ra, dec, response) {
             const {done, value} = await reader.read();
             if (done) break;
             size += value.length;
-            if (size > 5 * 1024 * 1024) return null;
+            if (size > 5 * 1024 * 1024) {
+              stages.set(index, 'byte limit');
+              return null;
+            }
             chunks.push(value);
           }
           const extensions = new Map();
+          stages.set(index, 'FITS or calibration parsing');
           readScienceImage(Buffer.concat(chunks), extensions);
           return calibratedCutout(extensions, ra, dec);
         } finally {
@@ -78,11 +81,16 @@ async function serveDifferences(products, ra, dec, response) {
       } catch {
         return null;
       }
-    })));
+  }));
+  const result = differenceFrames(frames, stages);
+  const diagnostics = products.map((product, index) => ({product, stage: stages.get(index)}));
+  if (!result) {
+    if (diagnostics.some(item => item.stage === 'download or timeout')) {
+      return send({retryable: true, reason: 'IRSA cutouts could not be downloaded. Try again.', diagnostics});
+    }
+    return send({reason: 'Need two early and one later exposure with matching wavelength coverage and usable calibration.', diagnostics});
   }
-  const result = differenceFrames(frames);
-  if (!result) return send({reason: 'Need two early and one later exposure with matching wavelength coverage and usable calibration.'});
-  send({images: result.frames.map(frame => frame && renderSvg(frame, [0, result.high]).svg)});
+  send({images: result.frames.map(frame => frame && renderSvg(frame, [0, result.high]).svg), diagnostics});
 }
 
 function renderSvg({width, height, pixels}, stretch) {

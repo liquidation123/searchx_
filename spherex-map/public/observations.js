@@ -13,6 +13,12 @@ export function setupObservations(viewer, A, closeInspector) {
   const slider = byId('observation-frame');
   const difference = byId('observation-difference');
   const differenceStatus = byId('observation-difference-status');
+  const differenceRetry = document.createElement('button');
+  differenceRetry.type = 'button';
+  differenceRetry.textContent = 'Retry static source subtraction';
+  differenceRetry.hidden = true;
+  differenceStatus.after?.(differenceRetry);
+  differenceRetry.addEventListener('click', () => { if (selected) void prepareDifferences(...selected); });
   let filtered;
   let differenceRequest;
   const play = byId('observation-play');
@@ -44,6 +50,7 @@ export function setupObservations(viewer, A, closeInspector) {
     difference.checked = false;
     difference.disabled = true;
     differenceStatus.textContent = '';
+    differenceRetry.hidden = true;
     stretch = undefined;
     viewport.hidden = true;
     setZoom(1);
@@ -145,6 +152,8 @@ export function setupObservations(viewer, A, closeInspector) {
 
   let sequenceStatus = '';
   async function prepareDifferences(ra, dec) {
+    differenceRequest?.abort();
+    differenceRetry.hidden = true;
     if (frames.length < 3) {
       differenceStatus.textContent = 'Static source subtraction needs at least three exposures.';
       return;
@@ -160,12 +169,16 @@ export function setupObservations(viewer, A, closeInspector) {
       const result = await answer.json();
       if (current.signal.aborted) return;
       filtered = result.images;
+      differenceRetry.hidden = !result.retryable;
       const available = filtered?.[Number(image.dataset.frame)] && !image.hidden;
       difference.disabled = !available;
       differenceStatus.textContent = available ? '' : result.reason ??
         'Static source subtraction is unavailable for this exposure.';
     } catch {
-      if (!current.signal.aborted) differenceStatus.textContent = 'Could not check exposure compatibility.';
+      if (!current.signal.aborted) {
+        differenceStatus.textContent = 'Could not check exposure compatibility.';
+        differenceRetry.hidden = false;
+      }
     }
   }
 

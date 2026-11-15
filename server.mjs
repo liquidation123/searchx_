@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { configuredMapStore, createMapSessionHandler } from './map-sessions.mjs';
+import { createSearchXMcpHandler } from './mcp-server.mjs';
 import { serveObjectPage } from './object-pages.mjs';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
@@ -38,6 +39,8 @@ const assets = new Map([
 ]);
 const mapStore = configuredMapStore();
 const mapsEnabled = process.env.SEARCHX_MAPS_ENABLED === '1' && !!mapStore;
+const mcpEnabled = process.env.SEARCHX_MCP_ENABLED === '1' && !!mapStore;
+const serveMcp = mcpEnabled ? createSearchXMcpHandler({ store: mapStore }) : null;
 if (mapsEnabled) {
   assets.set('/maps', ['map-start.html', 'text/html']);
   assets.set('/map-start.js', ['map-start.js', 'text/javascript']);
@@ -66,6 +69,10 @@ function sendJson(response, status, data) {
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (mcpEnabled && pathname === '/mcp') {
+    await serveMcp(request, response);
+    return;
+  }
   if (mapsEnabled && (pathname === '/map-sessions' || pathname.startsWith('/map-sessions/'))) {
     await serveMapSession(request, response, pathname);
     return;

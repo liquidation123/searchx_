@@ -8,6 +8,7 @@ import { servePreview } from './spherex-preview.mjs';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
+import { createMapSessionHandler } from './map-sessions.mjs';
 
 import { serveObservations } from './spherex-observations.mjs';
 import { serveBarnard } from './barnard/proxy.mjs';
@@ -15,6 +16,8 @@ import { serveBarnard } from './barnard/proxy.mjs';
 import { serveRegion } from './barnard/region-proxy.mjs';
 
 const assets = new Map([
+  ['/maps', ['map-start.html', 'text/html']],
+  ['/map-start.js', ['map-start.js', 'text/javascript']],
   ['/analytics.js', ['analytics.js', 'text/javascript']],
   ['/sieve-demo.js', ['spherex-map/public/sieve-demo.js', 'text/javascript']],
   ['/catalog-discovery.js', ['spherex-map/public/catalog-discovery.js', 'text/javascript']],
@@ -37,9 +40,14 @@ for (const font of ['audiowide.ttf', 'michroma.ttf', 'space-grotesk-400.ttf']) {
 const properties = await readFile(new URL("./spherex-map/public/irsa.properties", import.meta.url), "utf8");
 const irsa = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube";
 const port = Number(process.env.PORT ?? 5173);
+const serveMapSession = createMapSessionHandler();
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (pathname === '/map-sessions' || pathname.startsWith('/map-sessions/')) {
+    await serveMapSession(request, response, pathname);
+    return;
+  }
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
   if (pathname === '/analytics-config' && request.method === 'GET') { serveAnalyticsConfig(request, response); return; }
   if (pathname === '/gaia-source' && request.method === 'GET') { await serveGaiaSource(url, response); return; }

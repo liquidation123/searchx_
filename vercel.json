@@ -2,7 +2,7 @@
   "framework": null,
   "functions": {
     "api/viewer.mjs": {
-      "includeFiles": "{index.html,analytics.js,fonts/**,spherex-map/public/**,node_modules/aladin-lite/**}"
+      "includeFiles": "{index.html,map-start.html,map-start.js,analytics.js,fonts/**,spherex-map/public/**,node_modules/aladin-lite/**}"
     }
   },
   "rewrites": [

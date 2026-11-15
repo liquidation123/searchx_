@@ -651,8 +651,10 @@ async function start() {
       pointAt(sieveDemo.ra, sieveDemo.dec, .2);
       void selectObservations(sieveDemo.ra, sieveDemo.dec, false, sieveDemo);
       setStage('observe', sieveDemo.id);
+      document.querySelector('main').classList.add('sheet-expanded');
+      byId('sheet-toggle').setAttribute('aria-expanded', 'true');
+      byId('sheet-label').textContent = 'Collapse ↓';
     }
-    reviewCandidates.addEventListener('click', () => openSieveDemo());
     reviewCandidates.addEventListener('click', () => openSieveDemo());
     const sharedReview = location.pathname.match(/^\/community-reviews\/([0-9a-f-]{36})$/i);
     if (sharedReview) {

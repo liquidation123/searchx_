@@ -3,67 +3,60 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Review sky candidates and share your assessment.">
-  <title>SearchX — Daily game</title>
-  <link rel="stylesheet" href="/style.css">
+  <meta name="description" content="Can you predict which sky signals SIEVE flags for review?">
+  <title>SearchX — Daily sky hunt</title>
   <link rel="stylesheet" href="/daily-game.css">
   <script type="module" src="/daily-game.js"></script>
 </head>
 <body class="game-page">
-  <main class="game-app">
+  <main class="game-shell">
     <header class="game-topbar">
-      <a class="game-brand" href="/" aria-label="SearchX home">SearchX <span>DAILY GAME</span></a>
-      <a class="observatory-return" href="/observatory">Open observatory <span aria-hidden="true">↗</span></a>
+      <a class="game-brand" href="/" aria-label="SearchX home"><span class="brand-mark">✳</span> SearchX <span class="brand-divider">/</span> Daily sky hunt</a>
+      <div class="topbar-right"><a href="/observatory" class="sky-link">Open the observatory <span aria-hidden="true">↗</span></a><div class="score-pill"><span>YOUR SCORE</span><strong id="score-value">0</strong><small>pts</small></div></div>
     </header>
-    <div id="game-status" class="game-status" role="status" aria-live="polite">Loading today's candidate…</div>
-    <div id="game-content" hidden>
-      <section class="game-panel candidate-panel" aria-labelledby="candidate-title">
-        <div class="candidate-progress"><span id="candidate-count"></span><span id="candidate-source"></span></div>
-        <div class="candidate-grid">
-          <div class="observation-column">
-            <div class="observation-frame">
-              <img id="candidate-image" alt="SPHEREx observation of the candidate region" hidden>
-              <div id="image-placeholder" class="image-placeholder"><span class="placeholder-mark">✦</span><span>Loading sky image…</span></div>
-              <button class="frame-control frame-previous" id="frame-previous" type="button" aria-label="Previous observation">‹</button>
-              <button class="frame-control frame-next" id="frame-next" type="button" aria-label="Next observation">›</button>
-            </div>
-            <div class="frame-caption"><span id="frame-label"></span><span id="frame-date"></span></div>
+    <p id="game-status" class="game-status" role="status" aria-live="polite">Finding today’s signal…</p>
+    <section id="round" class="round" hidden aria-labelledby="round-title">
+      <div class="round-topline"><span id="round-count">SIGNAL 1 / 1</span><span class="source-chip"><i></i> SIEVE</span></div>
+      <div class="round-grid">
+        <section class="signal-view" aria-label="Sky observation">
+          <div class="signal-image-wrap">
+            <img id="signal-image" alt="SPHEREx observation. Study the region and make your prediction." hidden>
+            <div id="image-loading" class="image-loading"><span class="loading-star">✦</span><span>Loading the sky…</span></div>
+            <button id="previous-frame" class="image-nav previous" type="button" aria-label="Previous observation">←</button>
+            <button id="next-frame" class="image-nav next" type="button" aria-label="Next observation">→</button>
+            <div id="frame-count" class="frame-count">1 / 1</div>
           </div>
-          <div class="algorithm-column">
-            <div class="algorithm-heading"><img class="game-rabbit" src="/rabbits/front.png" alt=""><div><p class="eyebrow">SIEVE REVIEW</p><h1 id="candidate-title">Candidate</h1></div></div>
-            <div class="algorithm-note"><span class="note-label">SIEVE assessment</span><strong id="candidate-verdict" class="candidate-verdict"></strong><p id="candidate-brief" class="candidate-brief"></p><details class="algorithm-details"><summary>Review the evidence</summary><p id="candidate-summary"></p></details></div>
-            <div class="algorithm-actions">
-              <button class="control-button primary" id="confirm-button" type="button">Confirm</button>
-              <button class="control-button" id="challenge-button" type="button">Challenge</button><button class="control-button primary next-candidate" id="next-candidate-top" type="button" hidden>Next candidate</button>
+          <div class="signal-caption"><span id="frame-instrument">SPHEREx</span><span id="frame-date"></span></div>
+          <div class="coordinate-caption" id="signal-position"></div>
+        </section>
+        <section class="play-area" aria-live="polite">
+          <div class="round-label"><span class="live-dot"></span> TODAY’S SIGNAL</div>
+          <p id="candidate-name" class="candidate-name">Signal 01</p>
+          <h1 id="round-title">Can you spot a signal SIEVE flags?</h1>
+          <p class="round-instructions">Study the sky image. Make your call before you see SIEVE’s review.</p>
+          <fieldset class="guess-fieldset">
+            <legend>What will SIEVE say?</legend>
+            <div class="guess-options" id="guess-options">
+              <button class="guess-option" type="button" data-guess="flagged" aria-pressed="false"><span class="guess-symbol">✳</span><span><strong>Flag for review</strong><small>Something stands out</small></span></button>
+              <button class="guess-option" type="button" data-guess="clear" aria-pressed="false"><span class="guess-symbol clear-symbol">✓</span><span><strong>Looks ordinary</strong><small>No unusual signal</small></span></button>
             </div>
-            <p class="candidate-meta" id="candidate-position"></p>
-            <p id="candidate-result" class="inline-result" aria-live="polite"></p>
-          </div>
-        </div>
-      </section>
-      <section class="game-panel challenge-panel" id="challenge-panel" aria-labelledby="challenge-title" tabindex="-1">
-        <div class="challenge-observation">
-          <div class="challenge-progress"><span id="challenge-count"></span></div>
-          <div class="challenge-image-frame"><img id="challenge-image" alt="Current SPHEREx observation" hidden><div class="image-placeholder challenge-placeholder">Candidate image</div></div>
-          <div class="frame-caption"><span id="challenge-frame-label"></span><span id="challenge-frame-date"></span></div>
-        </div>
-        <div class="player-column">
-          <div class="player-heading"><img class="game-rabbit player-rabbit" src="/rabbits/front.png" alt=""><div><p class="eyebrow">YOUR TURN</p><h2 id="challenge-title" tabindex="-1">Your assessment</h2></div></div>
-          <fieldset class="assessment-fieldset">
-            <legend>Does this look like an anomaly?</legend>
-            <div class="assessment-options" id="assessment-options"></div>
           </fieldset>
-          <fieldset class="confidence-fieldset">
-            <legend>How sure are you?</legend>
-            <div class="confidence-options" id="confidence-options"></div>
-          </fieldset>
-          <label class="game-note-label" for="game-note">Your note <span>Optional</span></label>
-          <textarea id="game-note" rows="3" maxlength="2000" placeholder="What stands out to you?"></textarea>
-          <div class="challenge-actions"><button class="control-button" id="back-to-candidate" type="button">Back</button><button class="control-button primary" id="submit-assessment" type="button">Submit assessment</button><button class="control-button primary next-candidate" id="next-candidate-challenge" type="button" hidden>Next candidate</button></div>
-          <p id="challenge-result" class="inline-result" role="status" aria-live="polite"></p>
-        </div>
-      </section>
-    </div>
+          <div class="stakes-block"><div class="stakes-heading"><span>Set your stakes</span><span>More points, bigger risk</span></div><div id="stakes-options" class="stakes-options"></div></div>
+          <details class="note-details"><summary>Add a note <span>Optional</span></summary><textarea id="game-note" rows="2" maxlength="2000" placeholder="What caught your eye?"></textarea></details>
+          <button id="lock-guess" class="lock-button" type="button" disabled>Lock in your guess <span aria-hidden="true">→</span></button>
+          <p id="game-feedback" class="game-feedback" role="status" aria-live="polite"></p>
+          <section id="reveal" class="reveal" hidden aria-labelledby="reveal-title">
+            <div class="reveal-topline"><span id="result-stamp" class="result-stamp"></span><strong id="points-earned"></strong></div>
+            <h2 id="reveal-title"></h2>
+            <p id="reveal-summary" class="reveal-summary"></p>
+            <details id="reveal-details" class="reveal-details"><summary>See the evidence</summary><p id="reveal-evidence"></p></details>
+            <a id="review-link" class="review-link" hidden>Open your saved review ↗</a>
+            <button id="next-round" class="lock-button next-button" type="button">Next signal <span aria-hidden="true">→</span></button>
+          </section>
+        </section>
+      </div>
+    </section>
+    <section id="game-complete" class="game-complete" hidden><span>DAILY HUNT COMPLETE</span><h2>Nice exploring.</h2><p id="final-score"></p><a href="/observatory">Keep exploring the sky ↗</a></section>
   </main>
 </body>
 </html>

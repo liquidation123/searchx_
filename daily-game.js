@@ -1,282 +1,235 @@
-const status = document.querySelector('#game-status');
-const content = document.querySelector('#game-content');
-const count = document.querySelector('#candidate-count');
-const challengeCount = document.querySelector('#challenge-count');
-const candidateSource = document.querySelector('#candidate-source');
-const title = document.querySelector('#candidate-title');
-const summary = document.querySelector('#candidate-summary');
-const verdict = document.querySelector('#candidate-verdict');
-const brief = document.querySelector('#candidate-brief');
-const position = document.querySelector('#candidate-position');
-const image = document.querySelector('#candidate-image');
-const challengeImage = document.querySelector('#challenge-image');
-const imagePlaceholder = document.querySelector('#image-placeholder');
-const challengePlaceholder = document.querySelector('.challenge-placeholder');
-const frameLabel = document.querySelector('#frame-label');
-const frameDate = document.querySelector('#frame-date');
-const challengeFrameLabel = document.querySelector('#challenge-frame-label');
-const challengeFrameDate = document.querySelector('#challenge-frame-date');
-const candidateResult = document.querySelector('#candidate-result');
-const challengeResult = document.querySelector('#challenge-result');
-const assessmentOptions = document.querySelector('#assessment-options');
-const confidenceOptions = document.querySelector('#confidence-options');
-const challengePanel = document.querySelector('#challenge-panel');
+const $ = selector => document.querySelector(selector);
+const status = $('#game-status');
+const round = $('#round');
+const image = $('#signal-image');
+const loading = $('#image-loading');
+const frameCount = $('#frame-count');
+const scoreValue = $('#score-value');
+const guessOptions = $('#guess-options');
+const stakesOptions = $('#stakes-options');
+const lockButton = $('#lock-guess');
+const reveal = $('#reveal');
+const gameComplete = $('#game-complete');
+
+let gameData;
 let candidates = [];
-let candidateIndex = 0;
+let stakes = [];
+let roundIndex = 0;
 let frameIndex = 0;
-let selectedAssessment = '';
-let selectedConfidence = '';
-let answered = false;
+let guess = '';
+let stake = null;
+let score = 0;
+let savedAnswers = {};
 
-const assessmentChoices = [
-  { value: 'anomaly', label: 'Anomaly' },
-  { value: 'not_anomaly', label: 'Not an anomaly' },
-  { value: 'unsure', label: 'Not sure' },
-];
-const confidenceChoices = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-];
-
-function addChoice(container, group, item, onSelect) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'choice-button';
-  button.dataset.value = item.value;
-  button.textContent = item.label;
-  button.setAttribute('aria-pressed', 'false');
-  button.addEventListener('click', () => onSelect(item.value, container));
-  container.append(button);
-}
-function selectChoice(value, container) {
-  for (const button of container.querySelectorAll('button')) {
-    button.setAttribute('aria-pressed', String(button.dataset.value === value));
-  }
-}
-function candidate() { return candidates[candidateIndex]; }
-function formattedDate(value) {
+function currentCandidate() { return candidates[roundIndex]; }
+function dateLabel(value) {
   if (!value) return 'Date unavailable';
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+  return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(date);
 }
-function updateFrame() {
-  const item = candidate();
-  const frame = item.frames?.[frameIndex];
-  if (!frame) {
+function sessionKey() { return `searchx.sky-hunt.v1.${gameData.challengeId}`; }
+function persistGame() {
+  try { localStorage.setItem(sessionKey(), JSON.stringify({ score, answers: savedAnswers })); } catch {}
+}
+function setFrame(index) {
+  const frames = currentCandidate()?.frames ?? [];
+  if (!frames.length) {
+    loading.querySelector('span:last-child').textContent = 'No sky image is available for this signal.';
     image.hidden = true;
-    challengeImage.hidden = true;
-    imagePlaceholder.hidden = false;
-    challengePlaceholder.hidden = false;
-    imagePlaceholder.lastElementChild.textContent = 'No observation image available';
+    frameCount.textContent = '0 / 0';
     return;
   }
-  frameLabel.textContent = frame.detector ?? 'SPHEREx observation';
-  frameDate.textContent = formattedDate(frame.observedAt);
-  challengeFrameLabel.textContent = frame.detector ?? 'SPHEREx observation';
-  challengeFrameDate.textContent = formattedDate(frame.observedAt);
+  frameIndex = (index + frames.length) % frames.length;
+  const frame = frames[frameIndex];
+  frameCount.textContent = `${frameIndex + 1} / ${frames.length}`;
+  $('#frame-instrument').textContent = frame.detector ?? 'SPHEREx';
+  $('#frame-date').textContent = dateLabel(frame.observedAt);
+  loading.hidden = false;
+  loading.querySelector('span:last-child').textContent = 'Loading the sky…';
   image.hidden = true;
-  challengeImage.hidden = true;
-  imagePlaceholder.hidden = false;
-  challengePlaceholder.hidden = false;
-  imagePlaceholder.lastElementChild.textContent = 'Loading sky image…';
-  const next = new Image();
-  next.onload = () => {
-    image.src = next.src;
-    challengeImage.src = next.src;
+  const preload = new Image();
+  preload.onload = () => {
+    image.src = preload.src;
     image.hidden = false;
-    challengeImage.hidden = false;
-    imagePlaceholder.hidden = true;
-    challengePlaceholder.hidden = true;
+    loading.hidden = true;
   };
-  next.onerror = () => {
-    imagePlaceholder.lastElementChild.textContent = 'Image unavailable';
-    challengePlaceholder.textContent = 'Image unavailable';
+  preload.onerror = () => {
+    loading.hidden = false;
+    loading.querySelector('span:last-child').textContent = 'This sky image is unavailable. Try another frame.';
   };
-  next.src = frame.previewUrl;
+  preload.src = frame.previewUrl;
 }
-function renderCandidate() {
-  const item = candidate();
-  count.textContent = `${candidateIndex + 1} of ${candidates.length}`;
-  challengeCount.textContent = `${candidateIndex + 1} of ${candidates.length}`;
-  candidateSource.textContent = item.source ?? 'Candidate';
-  title.textContent = item.name ?? item.id;
-  verdict.textContent = item.verdict ?? 'Review suggested';
-  summary.textContent = item.summary ?? 'No additional evidence was provided.';
-  brief.textContent = item.brief ?? (item.summary?.split(/(?<=[.!?])\s+/, 1)[0] ?? 'Review the available observations.');
-  position.textContent = `RA ${Number(item.ra).toFixed(3)}° · Dec ${Number(item.dec).toFixed(3)}°`;
-  candidateResult.textContent = '';
-  challengeResult.textContent = '';
-  answered = false;
-  selectedAssessment = '';
-  selectedConfidence = '';
-  for (const button of [...assessmentOptions.querySelectorAll('button'), ...confidenceOptions.querySelectorAll('button')]) button.setAttribute('aria-pressed', 'false');
-  document.querySelector('#game-note').value = '';
-  document.querySelector('#confirm-button').hidden = false;
-  document.querySelector('#challenge-button').hidden = false;
-  document.querySelector('#confirm-button').disabled = false;
-  document.querySelector('#challenge-button').disabled = false;
-  document.querySelector('#submit-assessment').hidden = false;
-  document.querySelector('#submit-assessment').disabled = false;
-  document.querySelectorAll('.next-candidate').forEach(button => { button.hidden = true; });
+function updateScore() { scoreValue.textContent = score.toLocaleString(); }
+function resetGuess() {
+  guess = '';
+  stake = null;
+  for (const button of guessOptions.querySelectorAll('[data-guess]')) button.setAttribute('aria-pressed', 'false');
+  for (const button of stakesOptions.querySelectorAll('[data-stake]')) button.setAttribute('aria-pressed', 'false');
+  $('#game-note').value = '';
+  $('#game-feedback').textContent = '';
+  lockButton.disabled = true;
+  lockButton.hidden = false;
+  reveal.hidden = true;
+  $('#review-link').hidden = true;
+  $('#reveal-details').open = false;
+}
+function renderStakes() {
+  stakesOptions.replaceChildren();
+  for (const option of stakes) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'stake-option';
+    button.dataset.stake = option.id;
+    button.setAttribute('aria-pressed', 'false');
+    const label = document.createElement('strong');
+    label.textContent = option.label;
+    const points = document.createElement('small');
+    points.textContent = `${option.points} pts`;
+    button.append(label, points);
+    button.addEventListener('click', () => {
+      stake = option;
+      for (const item of stakesOptions.querySelectorAll('button')) item.setAttribute('aria-pressed', String(item === button));
+      updateLockButton();
+    });
+    stakesOptions.append(button);
+  }
+}
+function updateLockButton() {
+  lockButton.disabled = !guess || !stake;
+  lockButton.innerHTML = stake
+    ? `Lock in your guess <span aria-hidden="true">→</span><small>${stake.points} points at stake</small>`
+    : 'Lock in your guess <span aria-hidden="true">→</span>';
+}
+function renderRound() {
+  const item = currentCandidate();
+  resetGuess();
   frameIndex = 0;
-  updateFrame();
+  $('#round-count').textContent = `SIGNAL ${String(roundIndex + 1).padStart(2, '0')} / ${String(candidates.length).padStart(2, '0')}`;
+  $('#candidate-name').textContent = item.name ?? `Signal ${String(roundIndex + 1).padStart(2, '0')}`;
+  $('#signal-position').textContent = `RA ${Number(item.ra).toFixed(3)}°  ·  Dec ${Number(item.dec).toFixed(3)}°`;
+  setFrame(0);
 }
-function renderOptions() {
-  assessmentOptions.replaceChildren();
-  confidenceOptions.replaceChildren();
-  for (const item of assessmentChoices) addChoice(assessmentOptions, 'assessment', item, value => {
-    selectedAssessment = value;
-    selectChoice(value, assessmentOptions);
-  });
-  for (const item of confidenceChoices) addChoice(confidenceOptions, 'confidence', item, value => {
-    selectedConfidence = value;
-    selectChoice(value, confidenceOptions);
-  });
-}
-function localResponse(vote) {
-  const item = candidate();
-  const context = {
-    ra: item.ra, dec: item.dec, candidateName: item.name, source: item.source,
-    confidence: selectedConfidence || undefined,
-    frames: (item.frames ?? []).map(frame => ({ id: frame.id, observedAt: frame.observedAt })),
-  };
-  const record = {
-    id: crypto.randomUUID(), candidateId: item.id, vote,
-    note: document.querySelector('#game-note').value.trim(), context,
+function localResponse(item, vote, confidence, note) {
+  const key = 'searchx.game.responses.v1';
+  let rows = [];
+  try {
+    const previous = JSON.parse(localStorage.getItem(key) || '[]');
+    if (Array.isArray(previous)) rows = previous;
+  } catch {}
+  const row = {
+    id: crypto.randomUUID(), candidateId: item.id, vote, note,
+    context: { ra: item.ra, dec: item.dec, candidateName: item.name, source: item.source, confidence, frames: (item.frames ?? []).map(frame => ({ id: frame.id, observedAt: frame.observedAt })) },
     createdAt: new Date().toISOString(),
   };
-  const key = 'searchx.game.responses.v1';
-  let saved = [];
-  try {
-    const existing = JSON.parse(localStorage.getItem(key) || '[]');
-    if (Array.isArray(existing)) saved = existing;
-  } catch {}
-  saved.push(record);
-  localStorage.setItem(key, JSON.stringify(saved));
-  return { ...record, storage: 'local' };
+  rows.push(row);
+  localStorage.setItem(key, JSON.stringify(rows));
+  return { ...row, storage: 'local' };
 }
-async function saveResponse(vote) {
-  const item = candidate();
-  const note = document.querySelector('#game-note').value.trim();
+async function saveResponse(item, vote, confidence, note) {
   const context = {
-    ra: item.ra, dec: item.dec, candidateName: item.name, source: item.source,
-    confidence: selectedConfidence || undefined,
+    ra: item.ra, dec: item.dec, candidateName: item.name, source: item.source, confidence,
     frames: (item.frames ?? []).map(frame => ({ id: frame.id, observedAt: frame.observedAt })),
   };
   let response;
   try {
-    response = await fetch('/community-feedback', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidateId: item.id, vote, note, context }),
-    });
-  } catch {
-    return localResponse(vote);
-  }
-  if (response.status === 503 || response.status >= 500) return localResponse(vote);
+    response = await fetch('/community-feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidateId: item.id, vote, note, context }) });
+  } catch { return localResponse(item, vote, confidence, note); }
+  if (response.status === 503 || response.status >= 500) return localResponse(item, vote, confidence, note);
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error ?? 'Could not save your assessment.');
+    throw new Error(error.error ?? 'Your review could not be saved.');
   }
   return { ...(await response.json()), storage: 'cloud' };
 }
-function showSaved(result, vote) {
-  const voteLabel = { anomaly: 'Anomaly', not_anomaly: 'Not an anomaly', unsure: 'Not sure' }[vote];
-  const shareUrl = result.storage === 'cloud'
-    ? new URL(`/community-reviews/${result.id}`, location.origin).href
-    : '';
-  const messages = result.storage === 'cloud'
-    ? [`${voteLabel} saved.`, 'Your assessment is saved.']
-    : [`${voteLabel} saved on this device.`, 'Saved on this device. Cloud sync is not set up yet.'];
-  for (const [node, message] of [[candidateResult, messages[0]], [challengeResult, messages[1]]]) {
-    node.replaceChildren(document.createTextNode(message + ' '));
-    if (shareUrl) {
-      const link = document.createElement('a');
-      link.href = shareUrl;
-      link.textContent = 'Open review ↗';
-      link.className = 'review-share-link';
-      node.append(link);
+function showReveal(item, result, shouldSave = true) {
+  const outcome = item.gameVerdict;
+  const correct = result.guess === outcome;
+  const earned = correct ? result.stake.points : -result.stake.points;
+  if (shouldSave) {
+    score += earned;
+    savedAnswers[item.id] = result;
+    persistGame();
+  }
+  updateScore();
+  for (const button of guessOptions.querySelectorAll('[data-guess]')) button.setAttribute('aria-pressed', String(button.dataset.guess === result.guess));
+  for (const button of stakesOptions.querySelectorAll('[data-stake]')) button.setAttribute('aria-pressed', String(button.dataset.stake === result.stake.id));
+  $('#result-stamp').textContent = correct ? 'NICE READ' : 'SIEVE SAW IT DIFFERENTLY';
+  $('#result-stamp').className = `result-stamp ${correct ? 'is-correct' : 'is-missed'}`;
+  $('#points-earned').textContent = `${earned > 0 ? '+' : ''}${earned} pts`;
+  $('#reveal-title').textContent = outcome === 'flagged' ? 'SIEVE flagged this signal.' : 'SIEVE let this one pass.';
+  $('#reveal-summary').textContent = item.brief ?? (item.summary?.split(/(?<=[.!?])\s+/, 1)[0] ?? 'Review the available observations.');
+  $('#reveal-evidence').textContent = item.summary ?? 'No additional evidence was provided.';
+  $('#reveal').hidden = false;
+  lockButton.hidden = true;
+  if (roundIndex + 1 >= candidates.length) $('#next-round').textContent = 'Finish today’s hunt';
+  if (!shouldSave) return;
+  const vote = result.guess === 'flagged' ? 'anomaly' : 'not_anomaly';
+  saveResponse(item, vote, result.stake.id, result.note).then(saved => {
+    if (saved.storage === 'cloud') {
+      const link = $('#review-link');
+      link.href = new URL(`/community-reviews/${saved.id}`, location.origin).href;
+      link.hidden = false;
+    } else {
+      $('#game-feedback').textContent = 'Saved on this device. Cloud sync is not set up yet.';
     }
-  }
-  document.querySelector('#confirm-button').hidden = true;
-  document.querySelector('#challenge-button').hidden = true;
-  document.querySelector('#submit-assessment').hidden = true;
-  if (candidateIndex + 1 < candidates.length) {
-    const next = challengePanel.classList.contains('is-active') ? document.querySelector('#next-candidate-challenge') : document.querySelector('#next-candidate-top');
-    next.hidden = false;
-  } else {
-    const done = ' You’ve reviewed all available candidates.';
-    candidateResult.append(document.createTextNode(done));
-    challengeResult.append(document.createTextNode(done));
-  }
+  }).catch(error => { $('#game-feedback').textContent = error.message; });
 }
-
-async function submit(vote) {
-  if (answered) return;
-  answered = true;
-  document.querySelector('#confirm-button').disabled = true;
-  document.querySelector('#challenge-button').disabled = true;
-  document.querySelector('#submit-assessment').disabled = true;
-  try {
-    const result = await saveResponse(vote);
-    showSaved(result, vote);
-  } catch (error) {
-    answered = false;
-    document.querySelector('#confirm-button').disabled = false;
-    document.querySelector('#challenge-button').disabled = false;
-    document.querySelector('#submit-assessment').disabled = false;
-    const message = error.message;
-    if (challengePanel.classList.contains('is-active')) challengeResult.textContent = message;
-    else candidateResult.textContent = message;
-  }
+function lockGuess() {
+  if (!guess || !stake) return;
+  const item = currentCandidate();
+  showReveal(item, { guess, stake, note: $('#game-note').value.trim() });
 }
-function nextCandidate() {
-  if (candidateIndex + 1 >= candidates.length) return;
-  candidateIndex += 1;
-  challengePanel.classList.remove('is-active');
-  renderCandidate();
-  document.querySelector('.candidate-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+function finishGame() {
+  round.hidden = true;
+  gameComplete.hidden = false;
+  $('#final-score').textContent = `You earned ${score.toLocaleString()} points today.`;
 }
-
-document.querySelector('#confirm-button').addEventListener('click', () => submit('anomaly'));
-document.querySelector('#challenge-button').addEventListener('click', () => {
-  challengePanel.classList.add('is-active');
-  challengePanel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-  document.querySelector('#challenge-title').focus({ preventScroll: true });
-});
-document.querySelector('#next-candidate-top').addEventListener('click', nextCandidate);
-document.querySelector('#next-candidate-challenge').addEventListener('click', nextCandidate);
-document.querySelector('#back-to-candidate').addEventListener('click', () => {
-  challengePanel.classList.remove('is-active');
-  document.querySelector('.candidate-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
-document.querySelector('#submit-assessment').addEventListener('click', () => {
-  if (!selectedAssessment || !selectedConfidence) {
-    challengeResult.textContent = 'Choose an assessment and confidence level first.';
+function nextRound() {
+  const nextIndex = candidates.findIndex((item, index) => index > roundIndex && !savedAnswers[item.id]);
+  if (nextIndex >= 0) {
+    roundIndex = nextIndex;
+    renderRound();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
-  submit(selectedAssessment);
-});
-for (const [id, direction] of [['frame-previous', -1], ['frame-next', 1]]) {
-  document.querySelector('#' + id).addEventListener('click', () => {
-    const frames = candidate().frames ?? [];
-    if (!frames.length) return;
-    frameIndex = (frameIndex + direction + frames.length) % frames.length;
-    updateFrame();
-  });
+  finishGame();
 }
+guessOptions.addEventListener('click', event => {
+  const button = event.target.closest('[data-guess]');
+  if (!button) return;
+  guess = button.dataset.guess;
+  for (const item of guessOptions.querySelectorAll('[data-guess]')) item.setAttribute('aria-pressed', String(item === button));
+  updateLockButton();
+});
+$('#previous-frame').addEventListener('click', () => setFrame(frameIndex - 1));
+$('#next-frame').addEventListener('click', () => setFrame(frameIndex + 1));
+lockButton.addEventListener('click', lockGuess);
+$('#next-round').addEventListener('click', nextRound);
 
-renderOptions();
 try {
   const response = await fetch('/game-data', { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`Could not load game data (${response.status}).`);
-  const data = await response.json();
-  if (data.schemaVersion !== 1 || !Array.isArray(data.candidates)) throw new Error('Game data has an unsupported format.');
-  candidates = data.candidates.filter(item => item && typeof item.id === 'string' && Number.isFinite(item.ra) && Number.isFinite(item.dec));
-  if (!candidates.length) throw new Error('There are no candidates to review today.');
-  renderCandidate();
+  if (!response.ok) throw new Error(`Could not load today’s sky signals (${response.status}).`);
+  gameData = await response.json();
+  if (gameData.schemaVersion !== 1 || !Array.isArray(gameData.candidates) || !Array.isArray(gameData.stakes)) throw new Error('Today’s game data has an unsupported format.');
+  candidates = gameData.candidates.filter(item => item && typeof item.id === 'string' && Number.isFinite(item.ra) && Number.isFinite(item.dec) && ['flagged', 'clear'].includes(item.gameVerdict));
+  stakes = gameData.stakes.filter(item => typeof item.id === 'string' && Number.isFinite(item.points));
+  if (!candidates.length || !stakes.length) throw new Error('No playable sky signals are available right now.');
+  try {
+    const saved = JSON.parse(localStorage.getItem(sessionKey()) || '{}');
+    score = Number.isFinite(saved.score) ? saved.score : 0;
+    savedAnswers = saved.answers && typeof saved.answers === 'object' ? saved.answers : {};
+  } catch {}
+  updateScore();
+  renderStakes();
   status.hidden = true;
-  content.hidden = false;
+  const firstUnanswered = candidates.findIndex(item => !savedAnswers[item.id]);
+  if (firstUnanswered < 0) {
+    finishGame();
+  } else {
+    roundIndex = firstUnanswered;
+    round.hidden = false;
+    renderRound();
+  }
 } catch (error) {
   status.textContent = error.message;
   status.classList.add('is-error');

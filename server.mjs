@@ -109,7 +109,15 @@ export default async function handler(request, response) {
         previewUrl: '/spherex-preview?product=' + encodeURIComponent(new URL(frame.cutoutUrl).pathname) + '&ra=' + candidate.ra + '&dec=' + candidate.dec,
       })),
     }));
-    sendJson(response, 200, { schemaVersion: 1, source: 'SIEVE', candidates });
+    sendJson(response, 200, {
+      schemaVersion: 1, challengeId: new Date().toISOString().slice(0, 10), source: 'SIEVE',
+      stakes: [
+        { id: 'low', label: 'Low', points: 10 },
+        { id: 'medium', label: 'Medium', points: 25 },
+        { id: 'high', label: 'High', points: 50 },
+      ],
+      candidates: candidates.map(candidate => ({ ...candidate, gameVerdict: 'flagged' })),
+    });
     return;
   }
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }

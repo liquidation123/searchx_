@@ -8,6 +8,7 @@ import { servePreview } from './spherex-preview.mjs';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
+import { serveObjectPage } from './object-pages.mjs';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 
@@ -57,6 +58,10 @@ function sendJson(response, status, data) {
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/objects' || pathname.startsWith('/object/')) {
+    serveObjectPage(request, response, pathname);
+    return;
+  }
   const feedbackMatch = pathname.match(/^\/community-feedback(?:\/([0-9a-f-]{36}))?$/i);
   if (feedbackMatch) {
     if (!feedbackPool) { sendJson(response, 503, { error: 'Community feedback storage is not configured.' }); return; }

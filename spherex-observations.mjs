@@ -85,9 +85,23 @@ export async function serveObservations(url, response) {
     return;
   }
   const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), overallTimeoutMs);
   const onClose = () => { if (!response.writableEnded) controller.abort(); };
   response.once('close', onClose);
+  try {
+    const result = await queryObservations(ra, dec, { signal: controller.signal });
+    if (!response.destroyed) send(result.status === 'archive_unavailable' ? 502 : 200, result);
+  } finally {
+    response.removeListener('close', onClose);
+    controller.abort();
+  }
+}
+
+export async function queryObservations(ra, dec, { signal } = {}) {
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), overallTimeoutMs);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) controller.abort();
   try {
     async function query(collection, time) {
       const url = new URL('/SIA', archive);
@@ -144,17 +158,13 @@ export async function serveObservations(url, response) {
     const results = completed.flatMap(collection => collection.results);
     const truncated = partial || results.some(result => result.rowCount >= maxRecords);
     const frames = selectFrames(results.flatMap(result => result.frames));
-    if (response.destroyed) return;
-    if (partial && !frames.length) {
-      send(502, { status: 'archive_unavailable', frames: [] });
-      return;
-    }
-    send(200, { status: frames.length ? 'ready' : 'empty', frames, truncated });
+    if (partial && !frames.length) return { status: 'archive_unavailable', frames: [] };
+    return { status: frames.length ? 'ready' : 'empty', frames, truncated };
   } catch {
-    if (!response.destroyed) send(502, { status: 'archive_unavailable', frames: [] });
+    return { status: 'archive_unavailable', frames: [] };
   } finally {
     clearTimeout(deadline);
-    response.removeListener('close', onClose);
+    signal?.removeEventListener('abort', onAbort);
     controller.abort();
   }
 }

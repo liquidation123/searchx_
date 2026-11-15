@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSesame } from './name-resolve.mjs';
+import { serveGaiaSource } from './gaia-source.mjs';
 import { serveGaiaField } from './gaia-field.mjs';
 import { parseChimeEvent } from './chime-event.mjs';
 
 test('Sesame parser preserves catalog identity, coordinates and classification', () => {
   const result = parseSesame('<Sesame><Resolver name="Simbad"><oname>* alf CMa</oname><otype>SB*</otype><jradeg>101.287155333</jradeg><jdedeg>-16.716115861</jdedeg></Resolver></Sesame>');
   assert.deepEqual(result, { ra:101.287155333, dec:-16.716115861, id:'* alf CMa', category:'SB*' });
+  assert.equal(parseSesame('<Sesame><Resolver><jradeg> </jradeg><jdedeg>0</jdedeg></Resolver></Sesame>'), null);
   assert.equal(parseSesame('<Sesame><Resolver><oname>Unknown</oname></Resolver></Sesame>'), null);
   assert.equal(parseSesame('<Sesame><Resolver><jradeg>400</jradeg><jdedeg>0</jdedeg></Resolver></Sesame>'), null);
 });
@@ -30,4 +32,13 @@ test('Gaia field rejects unbounded and invalid cone queries before contacting ar
     assert.equal(code, 400);
     assert.equal(body.status, 'invalid_field');
   }
+});
+
+test('Gaia does not present absent photometry as zero magnitude', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('source_id,ra,dec,phot_g_mean_mag\n123,12,-5,'));
+  let code, body;
+  const response = {writeHead(status) { code = status; return this; }, end(value) { body = JSON.parse(value); }};
+  await serveGaiaSource(new URL('http://localhost/gaia-source?id=123'), response);
+  assert.equal(code, 200);
+  assert.equal(body.source.description, 'Source listed in Gaia DR3.');
 });

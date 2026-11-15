@@ -1,5 +1,5 @@
 export function serveAnalyticsConfig(request, response) {
-  const token = process.env.MIXPANEL_TOKEN?.trim();
+  const token = process.env.MIXPANEL_ENABLED === 'true' ? process.env.MIXPANEL_TOKEN?.trim() : null;
   const country = request.headers['x-vercel-ip-country'];
   response.writeHead(200, {
     'Content-Type': 'application/json; charset=utf-8',

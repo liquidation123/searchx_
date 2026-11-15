@@ -27,6 +27,9 @@ const assets = new Map([
   ['/observations.js', ['spherex-map/public/observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['spherex-map/public/barnard-timelapse.js', 'text/javascript']],
   ['/', ['index.html', 'text/html']],
+  ['/maps', ['map-start.html', 'text/html']],
+  ['/workspace.css', ['spherex-map/public/workspace.css', 'text/css']],
+  ['/workspace.js', ['spherex-map/public/workspace.js', 'text/javascript']],
   ['/observatory', ['spherex-map/public/index.html', 'text/html']],
   ['/app.js', ['spherex-map/public/app.js', 'text/javascript']],
   ['/ui-state.js', ['spherex-map/public/ui-state.js', 'text/javascript']],
@@ -42,7 +45,6 @@ const mapsEnabled = process.env.SEARCHX_MAPS_ENABLED === '1' && !!mapStore;
 const mcpEnabled = process.env.SEARCHX_MCP_ENABLED === '1' && !!mapStore;
 const serveMcp = mcpEnabled ? createSearchXMcpHandler({ store: mapStore }) : null;
 if (mapsEnabled) {
-  assets.set('/maps', ['map-start.html', 'text/html']);
   assets.set('/map-start.js', ['map-start.js', 'text/javascript']);
 }
 for (const font of ['audiowide.ttf', 'michroma.ttf', 'space-grotesk-400.ttf']) {
@@ -155,11 +157,8 @@ export default async function handler(request, response) {
       : path.startsWith('vendor/') ? './node_modules/aladin-lite/' + path.slice(7)
       : './' + path;
     let body = await readFile(new URL(source, import.meta.url));
-    if (pathname === '/' && mapsEnabled) {
-      body = Buffer.from(body.toString().replace(
-        'href="/observatory" aria-label="Explore the SearchX Observatory sky map">Explore the sky map',
-        'href="/maps" aria-label="Create or join a SearchX sky map">Create / Join Map'
-      ));
+    if (pathname === '/maps' && mapsEnabled) {
+      body = Buffer.from(body.toString().replace('<!-- SHARED_MAP_ENTRY -->', '<script type="module" src="/map-start.js"></script>'));
     }
     response.writeHead(200, { 'Content-Type': type + '; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Content-Length': body.length });
     response.end(request.method === 'HEAD' ? undefined : body);

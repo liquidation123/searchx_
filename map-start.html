@@ -1,7 +1,129 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Create or join a sky map · SearchX</title><meta name="description" content="Create a shared SearchX sky map or join one with an invite code.">
-<style>
-@font-face{font-family:Space;src:url('/fonts/space-grotesk-400.ttf') format('truetype');font-display:swap}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 70% 15%,#19152a,#090912 58%,#050408);color:#edf0f5;font:16px/1.5 Space,system-ui,sans-serif}main{max-width:980px;margin:auto;padding:clamp(26px,6vw,72px) 24px 64px}a{color:#b6d6f6}header{display:flex;justify-content:space-between;align-items:center;gap:20px}header a{text-decoration:none}header strong{letter-spacing:.16em;font-size:.85rem}h1{font-size:clamp(2.6rem,6vw,5rem);line-height:1.04;letter-spacing:-.05em;margin:70px 0 15px}p.lead{color:#abb4c5;max-width:620px;margin-bottom:42px}.grid{display:grid;grid-template-columns:1.25fr .9fr;gap:22px}.card{background:#171923;border:1px solid #343947;border-radius:16px;padding:clamp(22px,3vw,32px);box-shadow:0 18px 50px #0004}h2{font-size:1.45rem;margin:0 0 18px}.eyebrow{color:#9dbde1;font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;margin:0 0 8px}fieldset{border:0;padding:0;margin:20px 0}legend,.field-label{font-size:.9rem;color:#c2cbda;display:block;margin-bottom:10px}label.choice{display:flex;gap:10px;align-items:flex-start;margin:10px 0;color:#e6e9f0}small,.hint{color:#9ca7b8}input[type=radio],input[type=checkbox]{accent-color:#8ebce9;margin-top:5px}input[type=text],input[type=number],select{width:100%;background:#0d1019;color:#eef2f8;border:1px solid #4a5363;border-radius:9px;padding:11px 12px;font:inherit}input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #a7cff5;outline-offset:3px}.coordinates{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.coordinates label{font-size:.82rem;color:#aeb8c7}button{background:#d7e8fb;color:#101b2b;border:0;border-radius:9px;padding:12px 18px;font:600 1rem Space,system-ui,sans-serif;cursor:pointer}button:hover{background:#f2f8ff}button:disabled{opacity:.6;cursor:wait}.secondary{background:#293445;color:#edf4fb}.secondary:hover{background:#34465d}.result{margin-top:22px;padding:16px;border:1px solid #48617a;border-radius:10px;background:#202c3b}.result code{font-size:1.35rem;letter-spacing:.18em;color:#d4ebff}.result-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.status{min-height:1.5em;color:#d7a9a9}.join-form{display:grid;gap:14px}.join-form input{text-transform:uppercase;letter-spacing:.18em}.foot{margin-top:26px;color:#9ca7b8;font-size:.86rem}@media(max-width:720px){.grid{grid-template-columns:1fr}h1{margin-top:45px}.coordinates{grid-template-columns:1fr 1fr}.coordinates label:last-child{grid-column:span 2}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
-</style><script type="module" src="/map-start.js"></script></head><body><main><header><a href="/" aria-label="SearchX home"><strong>SEARCHX</strong></a><nav><a href="/objects">Explore objects</a> · <a href="/observatory">Open Observatory →</a></nav></header><h1>Explore the sky together.</h1><p class="lead">Create a map with the sky views you want, then share its invite code. Anyone with the code can open the same starting view. No account needed.</p><div class="grid"><section class="card"><p class="eyebrow">01 · Create</p><h2>Create a map</h2><form id="create-form"><fieldset><legend>Available sky datasets</legend><label class="choice"><input type="radio" name="mode" value="all" checked> <span><strong>All Datasets</strong><br><small>The complete Observatory experience</small></span></label><label class="choice"><input type="radio" name="mode" value="choose"> <span>Choose datasets</span></label><div id="dataset-choices" hidden><label class="choice"><input type="checkbox" name="dataset" value="optical" checked> DSS2 optical color</label><label class="choice"><input type="checkbox" name="dataset" value="infrared" checked> SPHEREx infrared DR1</label></div></fieldset><label class="field-label" for="start-object">Starting sky position</label><select id="start-object"></select><p class="hint">Or adjust the coordinates below. ICRS degrees; field of view in degrees.</p><div class="coordinates"><label>RA <input id="start-ra" type="number" min="0" max="359.999999" step="any" required></label><label>Dec <input id="start-dec" type="number" min="-90" max="90" step="any" required></label><label>Field <input id="start-fov" type="number" min="0.0001" max="180" step="any" required></label></div><p><button type="submit" id="create-button">Create map →</button></p><p id="create-status" class="status" role="status"></p></form><div id="created" class="result" hidden><div>Invite code <code id="invite-code"></code></div><small id="invite-expiry"></small><div class="result-actions"><button id="copy-code" type="button" class="secondary">Copy code</button><button id="copy-link" type="button" class="secondary">Copy link</button><a id="open-map" href="/observatory">Open map →</a></div><p id="copy-status" role="status"></p></div></section><section class="card"><p class="eyebrow">02 · Join</p><h2>Join a map</h2><form id="join-form" class="join-form"><label for="join-code">Enter a 10-character invite code</label><input id="join-code" type="text" autocomplete="off" maxlength="10" pattern="[A-HJ-NP-Za-hj-np-z2-9]{10}" required placeholder="XXXXXXXXXX"><button type="submit" id="join-button">Join map →</button><p id="join-status" class="status" role="status"></p></form><p class="foot">Invites last 30 days. You can always open the public Observatory directly.</p></section></div></main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sky maps · SearchX</title>
+  <meta name="description" content="Open the SearchX Observatory or start with a shared sky map.">
+  <style>
+    @font-face { font-family:Space; src:url('/fonts/space-grotesk-400.ttf') format('truetype'); font-display:swap; }
+    :root { color-scheme:dark; color:#edf1f8; background:#090b13; font:16px/1.55 Space,system-ui,sans-serif; --muted:#b0bacb; --line:#343d51; --accent:#d8eaff; }
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    main { width:min(100%, 1120px); margin:auto; padding:28px clamp(18px,5vw,56px) 56px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:18px; }
+    header a { text-decoration:none; }
+    header strong { color:#f4f7ff; letter-spacing:.16em; }
+    a { color:#bbd6f6; text-underline-offset:3px; }
+    h1,h2 { line-height:1.1; letter-spacing:-.035em; }
+    h1 { font-size:clamp(2.8rem,7vw,5.2rem); margin:clamp(30px,6vw,78px) 0 12px; }
+    h2 { font-size:1.65rem; margin:0 0 10px; }
+    .lead { color:var(--muted); max-width:54ch; margin:0 0 30px; }
+    .grid { display:grid; grid-template-columns:1.15fr .85fr; gap:22px; align-items:start; }
+    .card { background:#131824; border:1px solid var(--line); border-radius:16px; padding:clamp(18px,3.5vw,34px); }
+    .card p { max-width:56ch; }
+    .hint,small { color:var(--muted); }
+    fieldset { min-width:0; border:0; margin:20px 0; padding:0; }
+    legend,.field-label { display:block; margin-bottom:6px; font-weight:600; }
+    .choice { min-height:44px; display:flex; align-items:flex-start; gap:10px; padding:9px 10px; margin:6px 0; border:1px solid var(--line); border-radius:8px; cursor:pointer; }
+    .choice:has(input:checked) { border-color:#8aaad0; background:#1e293b; }
+    .choice input { accent-color:#b3d5fa; margin-top:.4em; }
+    input[type=text],input[type=number],select { width:100%; min-height:44px; padding:9px 12px; background:#0c111d; color:inherit; border:1px solid #566279; border-radius:8px; font:inherit; }
+    button,.button { display:inline-flex; justify-content:center; align-items:center; gap:8px; min-height:44px; background:var(--accent); color:#112339; border:1px solid transparent; border-radius:8px; padding:9px 17px; font:600 1rem Space,system-ui,sans-serif; text-decoration:none; cursor:pointer; }
+    button:hover,.button:hover { background:#f1f7ff; }
+    button:disabled { opacity:.6; cursor:wait; }
+    .secondary { background:#202b3d; color:#f0f5ff; border-color:#475871; }
+    .secondary:hover { background:#2e3e56; }
+    :focus-visible { outline:2px solid #a8cdf7; outline-offset:3px; }
+    details { margin:18px 0; padding:10px 0; border-block:1px solid var(--line); }
+    summary { cursor:pointer; }
+    .coordinates { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .coordinates label { font-size:.85rem; }
+    .result { margin-top:18px; padding:16px; border:1px solid #60799a; border-radius:10px; background:#18263a; }
+    .result code { display:block; margin:4px 0; font-size:clamp(1rem,4.5vw,1.55rem); letter-spacing:.12em; }
+    .result-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
+    .status { color:#d7e1f1; margin-bottom:0; }
+    [aria-invalid=true] { outline:1px solid #ffc7bd; }
+    #invite-link { margin-top:7px; font-size:.88rem; }
+    .invite-link-label { display:block; margin-top:12px; }
+    .status:empty { display:none; }
+    .join-form input { text-transform:uppercase; letter-spacing:.15em; margin-bottom:12px; }
+    .skip { margin-top:22px; }
+    .direct { max-width:650px; }
+    @media (max-width:720px) { .grid { grid-template-columns:1fr; } }
+    @media (max-width:350px) { .coordinates { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <a href="/" aria-label="SearchX home"><strong>SEARCHX</strong></a>
+      <a href="/objects">Object library</a>
+    </header>
+    <h1>Sky maps</h1>
+    <p class="lead">Explore optical and infrared views of the sky. Find an object and look through its observations.</p>
+    <section id="public-entry" class="card direct" aria-labelledby="public-title">
+      <h2 id="public-title">Explore the Observatory</h2>
+      <p>Start with the full sky map. Search for an object or choose a marked target to see what we know about it.</p>
+      <p class="hint">Shared map invites are currently unavailable.</p>
+      <a class="button" href="/observatory">Open Observatory <span aria-hidden="true">→</span></a>
+    </section>
+    <template id="shared-entry">
+      <div class="grid">
+        <section class="card" aria-labelledby="create-title">
+          <h2 id="create-title">Create a Map</h2>
+          <p class="hint">Choose the datasets and the starting object to share.</p>
+          <form id="create-form">
+            <fieldset>
+              <legend>Datasets</legend>
+              <label class="choice"><input type="radio" name="mode" value="all" checked> <span><strong>All Datasets</strong><br><small>Full Observatory experience</small></span></label>
+              <label class="choice"><input type="radio" name="mode" value="choose"> <span>Choose datasets</span></label>
+              <div id="dataset-choices" hidden>
+                <label class="choice"><input type="checkbox" name="dataset" value="optical" checked> DSS2 Optical</label>
+                <label class="choice"><input type="checkbox" name="dataset" value="infrared" checked> SPHEREx Infrared</label>
+              </div>
+            </fieldset>
+            <label class="field-label" for="start-object">Starting object</label>
+            <select id="start-object"></select>
+            <details id="advanced-settings">
+              <summary>Advanced Settings</summary>
+              <p class="hint">Enter coordinates and field of view in degrees.</p>
+              <div class="coordinates">
+                <label>Right ascension <input id="start-ra" type="number" min="0" max="359.999999" step="any" required></label>
+                <label>Declination <input id="start-dec" type="number" min="-90" max="90" step="any" required></label>
+                <label>Field of view <input id="start-fov" type="number" min="0.0001" max="180" step="any" required></label>
+              </div>
+            </details>
+            <button type="submit" id="create-button">Create Map</button>
+            <p id="create-status" class="status" role="status"></p>
+          </form>
+          <div id="created" class="result" hidden>
+            Invite code <code id="invite-code"></code>
+            <small id="invite-expiry"></small>
+            <label for="invite-link" class="invite-link-label">Invite link</label>
+            <input id="invite-link" type="text" readonly>
+            <div class="result-actions">
+              <a id="open-map" class="button" href="/observatory">Open Map</a>
+              <button id="copy-code" type="button" class="secondary">Copy code</button>
+              <button id="copy-link" type="button" class="secondary">Copy link</button>
+            </div>
+            <p id="copy-status" class="status" role="status"></p>
+          </div>
+        </section>
+        <section class="card" aria-labelledby="join-title">
+          <h2 id="join-title">Join a Map</h2>
+          <p class="hint">Open a shared map with its saved starting view and datasets. Each person can move around independently.</p>
+          <form id="join-form" class="join-form" novalidate>
+            <label class="field-label" for="join-code">10-character invite code</label>
+            <input id="join-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="join-status" required>
+            <button type="submit" id="join-button" class="secondary">Join Map</button>
+            <p id="join-status" class="status" role="status"></p>
+          </form>
+        </section>
+      </div>
+      <p class="skip"><a href="/observatory">Explore without creating a map <span aria-hidden="true">→</span></a></p>
+    </template>
+    <!-- SHARED_MAP_ENTRY -->
+  </main>
+</body>
+</html>

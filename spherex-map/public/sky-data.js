@@ -1,10 +1,5 @@
 export const surveyRoot = 'https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube';
 const archiveEpoch = 2026;
-const aavsoCurve = name => 'https://www.aavso.org/LCGv2/index.htm?' + new URLSearchParams({
-  view: 'api.delim', ident: name, DateFormat: 'Calendar', RequestedBands: 'V',
-  fromjd: '2459000', tojd: '2461250',
-});
-
 function movingTarget(target, anchor, motion) {
   // Approximate the center of the survey field using linear proper motion.
   // The RA motion is μα cos δ in milliarcseconds per year.
@@ -52,7 +47,7 @@ export const featuredTargets = [
     description: 'A young binary with deep, irregular drops in brightness. Dust around the system can block light from the primary star.',
     source: 'AAVSO VSX', url: 'https://vsx.aavso.org/index.php?revid=418953&view=detail.top',
     positionLabel: 'ICRS · J2000.0',
-    evidence: { label: 'Open the observed AAVSO light curve', url: aavsoCurve('RW Aur'),
+    evidence: { label: 'See the published RW Aur light curves', url: 'https://arxiv.org/html/1512.03745#S2.F2',
       note: 'Use the light curve to look for dips in brightness over time.' },
   },
   {
@@ -61,7 +56,7 @@ export const featuredTargets = [
     description: 'A pulsating red giant in Draco. Its brightness rises and falls on a cycle of about 246 days.',
     source: 'SIMBAD', url: 'https://simbad.u-strasbg.fr/simbad/sim-id?Ident=R+Dra',
     positionLabel: 'ICRS · J2000.0',
-    evidence: { label: 'Open the observed AAVSO light curve', url: aavsoCurve('R Dra'),
+    evidence: { label: 'See the BAA light curve', url: 'https://britastro.org/vss/objects/gifm/00166a.gif',
       note: 'Compare several peaks to see the repeating brightness cycle.' },
   },
 ];

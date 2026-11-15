@@ -26,6 +26,7 @@ const exhibits = {
 function syncState() { document.querySelector('main').dataset.state = uiState({searchOpen:!byId('search-popup').hidden, inspectorOpen:!byId('inspector').hidden, lessonOpen:!byId('lesson').hidden}); }
 const blankFrames = new Set([50, 51]);
 const home = references[0];
+let mapSession = null;
 const loadedFrames = new Set();
 let viewer, A, layer, selectObservations;
 let showResolvedMarker = () => {};
@@ -261,7 +262,9 @@ byId('share-view').addEventListener('click', async () => {
     const state = {ra: Number(((ra % 360 + 360) % 360).toPrecision(12)) % 360, dec: Number(dec.toPrecision(12)),
       fov: Number(viewer.getFoV()[0].toPrecision(12)), survey: survey.value};
     if (state.survey === 'infrared') state.channel = Number(channel.value);
-    const url = encodeView(location.href, state);
+    const sharedUrl = new URL(encodeView(location.href, state));
+    if (mapSession) sharedUrl.searchParams.set('map', mapSession.code);
+    const url = sharedUrl.href;
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
       await navigator.clipboard.writeText(url);
@@ -586,6 +589,18 @@ for(const id of ['inspector','lesson','observation-panel','barnard-panel']) stor
 
 async function start() {
   try {
+    const invite = new URLSearchParams(location.search).get('map');
+    if (invite) {
+      try {
+        if (!/^[A-HJ-NP-Z2-9]{10}$/i.test(invite)) throw new Error('Invalid invite code.');
+        const reply = await fetch('/map-sessions/' + encodeURIComponent(invite));
+        const result = await reply.json();
+        if (!reply.ok) throw new Error(result.error || 'Map invite unavailable.');
+        mapSession = result;
+      } catch (error) {
+        showNotice(`${error.message} You can create or join a map at /maps.`);
+      }
+    }
     const metadata = fetch('/irsa.properties').then(response => {
       if (!response.ok) throw new Error('Wavelength labels unavailable.');
       return response.text();
@@ -735,13 +750,16 @@ async function start() {
     const wavelengths = await metadata;
     survey.disabled = false;
     if (!wavelengths) { survey.options[1].textContent = 'SPHEREx · unavailable'; survey.options[1].disabled = true; }
+    if (mapSession && mapSession.datasets !== 'all') {
+      for (const option of survey.options) option.disabled = option.disabled || !mapSession.datasets.includes(option.value);
+    }
     (wavelengths ?? []).forEach((wavelength, index) => {
       channel.add(new Option(`${wavelength.toFixed(3)} µm${blankFrames.has(index) ? ' · no image' : ''}`, index));
       channel.options[index].disabled = blankFrames.has(index);
     });
     channel.value = String(activeFrame);
     channel.disabled = true;
-    const shared = decodeView(location.search, wavelengths?.length ?? 102);
+    const shared = decodeView(location.search, wavelengths?.length ?? 102) ?? mapSession?.view;
     if (shared) {
       const infraredUnavailable = shared.survey === 'infrared' && !wavelengths;
       restoreView(infraredUnavailable ? {...shared, survey:'optical', channel:undefined} : shared, {

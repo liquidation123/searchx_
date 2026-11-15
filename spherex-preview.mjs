@@ -201,9 +201,31 @@ export async function servePreview(url, response) {
     return;
   }
   let reader;
+  const controller = new AbortController();
+  const onClose = () => { if (!response.writableEnded) controller.abort(); };
+  response.once('close', onClose);
   try {
-    const upstream = await fetch(source, { redirect: 'error', signal: AbortSignal.timeout(10000) });
-    if (!upstream.ok || !upstream.body) throw new Error('Cutout unavailable');
+    let upstream;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(5500)]);
+        upstream = await fetch(source, { redirect: 'error', signal });
+        if (upstream.ok && upstream.body) break;
+        await upstream.body?.cancel();
+        if (![408, 429].includes(upstream.status) && upstream.status < 500) {
+          throw Object.assign(new Error('IRSA HTTP ' + upstream.status), {permanent: true});
+        }
+        throw new Error('Cutout unavailable');
+      } catch (error) {
+        if (controller.signal.aborted || error.permanent || attempt === 1) throw error;
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => { controller.signal.removeEventListener('abort', abort); resolve(); }, 350);
+          const abort = () => { clearTimeout(timer); reject(controller.signal.reason); };
+          controller.signal.addEventListener('abort', abort, {once: true});
+          if (controller.signal.aborted) abort();
+        });
+      }
+    }
     reader = upstream.body.getReader();
     let bytes = Buffer.alloc(0);
     while (bytes.length < maxBytes) {
@@ -223,8 +245,10 @@ export async function servePreview(url, response) {
     }
     throw new Error('Science image is missing');
   } catch {
-    response.writeHead(502, { 'Cache-Control': 'no-store' }).end();
+    if (!response.destroyed) response.writeHead(502, { 'Cache-Control': 'no-store' }).end();
   } finally {
+    response.removeListener('close', onClose);
+    controller.abort();
     if (reader) void reader.cancel().catch(() => {});
   }
 }

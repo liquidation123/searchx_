@@ -168,6 +168,7 @@ async function initialize() {
     const { default: mixpanel } = await import('https://cdn.mxpnl.com/libs/mixpanel-js/dist/mixpanel.module.js');
     sdk = mixpanel;
     sdk.init(config.token, {
+      api_host: config.region === 'EU' ? 'https://api-eu.mixpanel.com' : 'https://api-js.mixpanel.com',
       autocapture: false, track_pageview: false, record_sessions_percent: 0,
       ip: false, save_referrer: false, skip_first_touch_marketing: true,
       stop_utm_persistence: true, persistence: 'localStorage',

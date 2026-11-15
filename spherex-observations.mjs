@@ -81,6 +81,11 @@ export async function serveObservations(url, response) {
     send(400, { status: 'invalid_position' });
     return;
   }
+  const result = await queryObservations(ra, dec);
+  send(result.status === 'archive_unavailable' ? 502 : 200, result);
+}
+
+export async function queryObservations(ra, dec) {
   try {
     const signal = AbortSignal.timeout(10000);
     async function query(collection, time) {
@@ -108,8 +113,8 @@ export async function serveObservations(url, response) {
     }))).flat();
     const truncated = results.some(result => result.rowCount >= maxRecords);
     const frames = selectFrames(results.flatMap(result => result.frames));
-    send(200, { status: frames.length ? 'ready' : 'empty', frames, truncated });
+    return { status: frames.length ? 'ready' : 'empty', frames, truncated };
   } catch {
-    send(502, { status: 'archive_unavailable', frames: [] });
+    return { status: 'archive_unavailable', frames: [] };
   }
 }

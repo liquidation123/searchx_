@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { createMapSessionHandler } from './map-sessions.mjs';
+import { serveObjectPage } from './object-pages.mjs';
 
 import { serveObservations } from './spherex-observations.mjs';
 import { serveBarnard } from './barnard/proxy.mjs';
@@ -44,6 +45,10 @@ const serveMapSession = createMapSessionHandler();
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/objects' || pathname.startsWith('/object/')) {
+    serveObjectPage(request, response, pathname);
+    return;
+  }
   if (pathname === '/map-sessions' || pathname.startsWith('/map-sessions/')) {
     await serveMapSession(request, response, pathname);
     return;

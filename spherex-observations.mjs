@@ -1,4 +1,8 @@
+import { sieveDemo } from './spherex-map/public/sieve-demo.js';
+
 const archive = 'https://irsa.ipac.caltech.edu';
+const lastGood = new Map();
+const demoKey = [sieveDemo.ra, sieveDemo.dec].map(value => Number(value.toFixed(6))).join(',');
 const maxRecords = 1000;
 const collections = ['spherex_dr1', 'spherex_qr3'];
 const requestTimeoutMs = 8000;
@@ -97,12 +101,33 @@ export async function serveObservations(url, response) {
 }
 
 export async function queryObservations(ra, dec, { signal } = {}) {
+  const key = ra + ',' + dec;
+  const expires = Date.now() + overallTimeoutMs;
+  function unavailable() {
+    const saved = lastGood.get(key) ?? (key === demoKey || key === sieveDemo.ra + ',' + sieveDemo.dec
+      ? {frames: sieveDemo.frames, refreshedAt: '2026-11-14', coverage: 'curated'} : null);
+    return saved && !signal?.aborted
+      ? {status: 'ready', truncated: true, ...saved}
+      : {status: 'archive_unavailable', frames: []};
+  }
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), overallTimeoutMs);
   const onAbort = () => controller.abort();
   signal?.addEventListener('abort', onAbort, { once: true });
   if (signal?.aborted) controller.abort();
   try {
+    let activeWindows = 0;
+    const waitingWindows = [];
+    async function windowQuery(collection, time) {
+      if (activeWindows >= 3) await new Promise(resolve => waitingWindows.push(resolve));
+      else activeWindows++;
+      try { return await query(collection, time); }
+      finally {
+        const next = waitingWindows.shift();
+        if (next) next();
+        else activeWindows--;
+      }
+    }
     async function query(collection, time) {
       const url = new URL('/SIA', archive);
       url.search = new URLSearchParams({
@@ -111,14 +136,36 @@ export async function queryObservations(ra, dec, { signal } = {}) {
       });
       if (time) url.searchParams.set('TIME', time);
       for (let attempt = 0; attempt < 2; attempt++) {
+        if (controller.signal.aborted) throw controller.signal.reason;
         let upstream;
+        let delay = retryDelayMs;
+        let failure = 'download';
+        const started = Date.now();
+        const timeout = AbortSignal.timeout(requestTimeoutMs);
+        const report = outcome => console.info('SPHEREx lookup', {
+          collection, stage: time ? 'time_window' : 'initial', attempt: attempt + 1,
+          status: upstream?.status ?? null, elapsedMs: Date.now() - started, outcome,
+        });
         try {
-          const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(requestTimeoutMs)]);
+          const signal = AbortSignal.any([controller.signal, timeout]);
           upstream = await fetch(url, { signal });
           if (upstream.ok) {
             const csv = await upstream.text();
-            try { return exposureRows(csv, ra, dec); }
-            catch (error) { error.permanent = true; throw error; }
+            try {
+              const result = exposureRows(csv, ra, dec);
+              report(result.rowCount ? 'success' : 'empty');
+              return result;
+            } catch (error) {
+              failure = 'invalid_body';
+              error.permanent = true;
+              throw error;
+            }
+          }
+          failure = 'http_error';
+          const retryAfter = upstream.headers.get('retry-after');
+          if (retryAfter?.trim()) {
+            const wait = /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now();
+            if (Number.isFinite(wait)) delay = Math.max(delay, wait);
           }
           await upstream.body?.cancel();
           if (![408, 429].includes(upstream.status) && upstream.status < 500) {
@@ -126,9 +173,11 @@ export async function queryObservations(ra, dec, { signal } = {}) {
           }
           throw new Error('IRSA HTTP ' + upstream.status);
         } catch (error) {
-          if (controller.signal.aborted || error.permanent || attempt === 1) throw error;
+          report(timeout.aborted ? 'timeout' : controller.signal.aborted
+            ? (signal?.aborted ? 'cancelled' : 'timeout') : failure);
+          if (controller.signal.aborted || error.permanent || attempt === 1 || Date.now() + delay >= expires) throw error;
           await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => { controller.signal.removeEventListener('abort', abort); resolve(); }, retryDelayMs);
+            const timer = setTimeout(() => { controller.signal.removeEventListener('abort', abort); resolve(); }, delay);
             const abort = () => { clearTimeout(timer); reject(controller.signal.reason); };
             controller.signal.addEventListener('abort', abort, {once: true});
             if (controller.signal.aborted) abort();
@@ -144,7 +193,7 @@ export async function queryObservations(ra, dec, { signal } = {}) {
       const stop = collection === 'spherex_dr1' ? 61177 : end;
       const windows = [];
       for (let day = start; day < stop; day += 60) {
-        windows.push(query(collection, day + ' ' + Math.min(day + 60, stop)));
+        windows.push(windowQuery(collection, day + ' ' + Math.min(day + 60, stop)));
       }
       const settledWindows = await Promise.allSettled(windows);
       const partial = !windows.length || settledWindows.some(window => window.status === 'rejected');
@@ -158,10 +207,17 @@ export async function queryObservations(ra, dec, { signal } = {}) {
     const results = completed.flatMap(collection => collection.results);
     const truncated = partial || results.some(result => result.rowCount >= maxRecords);
     const frames = selectFrames(results.flatMap(result => result.frames));
-    if (partial && !frames.length) return { status: 'archive_unavailable', frames: [] };
+    if (partial && !frames.length) return unavailable();
+    if (frames.length && !partial && !signal?.aborted) {
+      lastGood.delete(key);
+      lastGood.set(key, {frames, refreshedAt: new Date().toISOString(), coverage: 'cached'});
+      if (lastGood.size > 128) lastGood.delete(lastGood.keys().next().value);
+    } else if (!truncated && !signal?.aborted) {
+      lastGood.delete(key);
+    }
     return { status: frames.length ? 'ready' : 'empty', frames, truncated };
   } catch {
-    return { status: 'archive_unavailable', frames: [] };
+    return unavailable();
   } finally {
     clearTimeout(deadline);
     signal?.removeEventListener('abort', onAbort);

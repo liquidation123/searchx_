@@ -35,6 +35,7 @@ const assets = new Map([
   ['/quiz-data.js', ['spherex-map/public/quiz-data.js', 'text/javascript']],
   ['/search.js', ['spherex-map/public/search.js', 'text/javascript']],
   ['/sky-data.js', ['spherex-map/public/sky-data.js', 'text/javascript']],
+  ['/spectral-guide.js', ['spherex-map/public/spectral-guide.js', 'text/javascript']],
   ['/style.css', ['spherex-map/public/style.css', 'text/css']],
   ['/irsa.properties', ['spherex-map/public/irsa.properties', 'text/plain']],
   ['/vendor/aladin.js', ['vendor/aladin.js', 'text/javascript']],

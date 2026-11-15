@@ -9,6 +9,7 @@ import { setupCatalogDiscovery } from './catalog-discovery.js';
 import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSelected, objectExplored, featureUsed, track } from '/analytics.js';
 
 import { setupBarnard } from './barnard-timelapse.js';
+import { spectralFeatures, spectralRegions, nearestWavelengthIndex } from './spectral-guide.js';
 
 const byId = id => document.getElementById(id);
 const channel = byId('channel');
@@ -24,6 +25,84 @@ const exhibits = {
   'M 101': {type:'SPIRAL GALAXY', why:'We see this spiral galaxy nearly face-on, making its arms and star-forming regions easier to study across the disk.', url:'https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-101/'}
 };
 function syncState() { document.querySelector('main').dataset.state = uiState({searchOpen:!byId('search-popup').hidden, inspectorOpen:!byId('inspector').hidden, lessonOpen:!byId('lesson').hidden}); }
+
+function setupSpectralGuide(wavelengths) {
+  const regionSelect = byId('spectral-region');
+  const featureList = byId('spectral-feature-list');
+  regionSelect.add(new Option('Choose a region', ''));
+  for (const region of spectralRegions) regionSelect.add(new Option(region.name, region.id));
+
+  function renderFeatures(region) {
+    featureList.replaceChildren();
+    for (const feature of spectralFeatures.filter(item => item.regions.includes(region.id))) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'spectral-feature-button';
+      button.dataset.feature = feature.id;
+      button.textContent = feature.label;
+      button.disabled = !wavelengths?.length;
+      button.addEventListener('click', () => {
+        const index = nearestWavelengthIndex(wavelengths, feature.wavelength);
+        if (index < 0) return;
+        const usableIndex = blankFrames.has(index)
+          ? [index - 1, index + 1].find(candidate => candidate >= 0 && candidate < wavelengths.length && !blankFrames.has(candidate))
+          : index;
+        if (usableIndex === undefined) return;
+        channel.value = String(usableIndex);
+        survey.value = 'infrared';
+        survey.dispatchEvent(new Event('change'));
+        byId('spectral-feature-detail').textContent = `${feature.detail} Showing ${wavelengths[usableIndex].toFixed(3)} μm brightness, nearest to ${feature.wavelength.toFixed(2)} μm. This is not a molecule detection.`;
+        byId('spectral-source').href = feature.source;
+        byId('spectral-source').hidden = false;
+        const result = byId('spectral-published-result');
+        const publishedImageShowsFeature = region.id === 'cygnus-x' && ['water-ice', 'pah'].includes(feature.id);
+        byId('spectral-result-status').textContent = publishedImageShowsFeature
+          ? `Published SPHEREx map: ${feature.label} is mapped in Cygnus X. The map above shows the region-level result, not a reading at the cursor.`
+          : region.id === 'rosette'
+            ? `Research preprint: ${feature.label} maps are reported for Rosette. The band view is not a detection; open the source for the analysis.`
+            : `Published study: ${feature.label} is mapped in ${region.name}. This guide does not measure its strength at the cursor.`;
+        result.hidden = !publishedImageShowsFeature;
+        if (publishedImageShowsFeature) {
+          byId('spectral-published-caption').textContent = feature.id === 'water-ice'
+            ? 'Published SPHEREx result · Cygnus X. Water ice is shown in blue. This region-level map is separate from the live brightness view above.'
+            : 'Published SPHEREx result · Cygnus X. PAH emission is shown in orange. This region-level map is separate from the live brightness view above.';
+          byId('spectral-source').href = 'https://www.jpl.nasa.gov/images/pia26748-nasas-spherex-mission-maps-water-ice-throughout-cygnus-x/';
+        } else {
+          byId('spectral-feature-detail').textContent += ' Published research reports this feature in the selected region; this app does not calculate its strength at the cursor.';
+        }
+        featureUsed('spectral feature guide', feature.id);
+      });
+      featureList.append(button);
+    }
+  }
+
+  regionSelect.addEventListener('change', () => {
+    const region = spectralRegions.find(item => item.id === regionSelect.value);
+    if (!region) return;
+    pointAt(region.ra, region.dec, region.fov);
+    rememberTarget(region.ra, region.dec, region.name, region.fov);
+    byId('spectral-region-note').textContent = region.note;
+    byId('spectral-feature-detail').textContent = 'Choose a feature below to inspect its nearest SPHEREx band.';
+    byId('spectral-result-status').textContent = 'Choose a feature to see what published observations show for this region.';
+    byId('spectral-source').href = region.source;
+    byId('spectral-source').hidden = false;
+    byId('spectral-published-result').hidden = region.id !== 'cygnus-x';
+    if (region.id === 'cygnus-x') {
+      byId('spectral-published-caption').textContent = 'Published SPHEREx result · Cygnus X. Blue: water ice. Orange: PAH emission. This is a region-level scientific map, not a live measurement at the map cursor.';
+      byId('spectral-source').href = 'https://www.jpl.nasa.gov/images/pia26748-nasas-spherex-mission-maps-water-ice-throughout-cygnus-x/';
+    }
+    renderFeatures(region);
+  });
+
+  regionSelect.value = spectralRegions[0].id;
+  regionSelect.value = '';
+  byId('spectral-cygnus-shortcut').addEventListener('click', () => {
+    regionSelect.value = 'cygnus-x';
+    regionSelect.dispatchEvent(new Event('change'));
+    featureList.querySelector('[data-feature="water-ice"]')?.click();
+    byId('spectral-published-result').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+}
 const blankFrames = new Set([50, 51]);
 const home = references[0];
 let mapSession = null;
@@ -846,6 +925,7 @@ async function start() {
     updatePosition();
     if (notice.textContent === 'Starting the sky map…') showNotice('');
     const wavelengths = await metadata;
+    setupSpectralGuide(wavelengths);
     survey.disabled = false;
     if (!wavelengths) { survey.options[1].textContent = 'SPHEREx · unavailable'; survey.options[1].disabled = true; }
     if (mapSession && mapSession.datasets !== 'all') {

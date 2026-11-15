@@ -85,9 +85,23 @@ export async function serveObservations(url, response) {
     return;
   }
   const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), overallTimeoutMs);
   const onClose = () => { if (!response.writableEnded) controller.abort(); };
   response.once('close', onClose);
+  try {
+    const result = await queryObservations(ra, dec, { signal: controller.signal });
+    if (!response.destroyed) send(result.status === 'archive_unavailable' ? 502 : 200, result);
+  } finally {
+    response.removeListener('close', onClose);
+    controller.abort();
+  }
+}
+
+export async function queryObservations(ra, dec, { signal } = {}) {
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), overallTimeoutMs);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) controller.abort();
   try {
     async function query(collection, time) {
       const url = new URL('/SIA', archive);
@@ -122,9 +136,9 @@ export async function serveObservations(url, response) {
         }
       }
     }
-    const results = (await Promise.all(collections.map(async collection => {
+    const settled = await Promise.allSettled(collections.map(async collection => {
       const initial = await query(collection);
-      if (initial.rowCount < maxRecords) return [initial];
+      if (initial.rowCount < maxRecords) return { results: [initial], partial: false };
       const end = Math.ceil(Date.now() / 86400000 + 40587);
       const start = collection === 'spherex_dr1' ? 60745 : 61176;
       const stop = collection === 'spherex_dr1' ? 61177 : end;
@@ -132,16 +146,25 @@ export async function serveObservations(url, response) {
       for (let day = start; day < stop; day += 60) {
         windows.push(query(collection, day + ' ' + Math.min(day + 60, stop)));
       }
-      return Promise.all(windows);
-    }))).flat();
-    const truncated = results.some(result => result.rowCount >= maxRecords);
+      const settledWindows = await Promise.allSettled(windows);
+      const partial = !windows.length || settledWindows.some(window => window.status === 'rejected');
+      const results = settledWindows.flatMap(window => window.status === 'fulfilled' ? [window.value] : []);
+      // A capped response still contains verified exposures that can fill failed windows.
+      if (partial) results.push(initial);
+      return { results, partial };
+    }));
+    const completed = settled.flatMap(collection => collection.status === 'fulfilled' ? [collection.value] : []);
+    const partial = completed.length < collections.length || completed.some(collection => collection.partial);
+    const results = completed.flatMap(collection => collection.results);
+    const truncated = partial || results.some(result => result.rowCount >= maxRecords);
     const frames = selectFrames(results.flatMap(result => result.frames));
-    send(200, { status: frames.length ? 'ready' : 'empty', frames, truncated });
+    if (partial && !frames.length) return { status: 'archive_unavailable', frames: [] };
+    return { status: frames.length ? 'ready' : 'empty', frames, truncated };
   } catch {
-    if (!response.destroyed) send(502, { status: 'archive_unavailable', frames: [] });
+    return { status: 'archive_unavailable', frames: [] };
   } finally {
     clearTimeout(deadline);
-    response.removeListener('close', onClose);
+    signal?.removeEventListener('abort', onAbort);
     controller.abort();
   }
 }

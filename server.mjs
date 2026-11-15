@@ -1,4 +1,5 @@
 import { serveNameResolve } from './name-resolve.mjs';
+import { serveAnalyticsConfig } from './analytics-config.mjs';
 import { serveGaiaSource } from './gaia-source.mjs';
 import { serveGaiaField } from './gaia-field.mjs';
 import { serveChimeEvent } from './chime-event.mjs';
@@ -14,6 +15,7 @@ import { serveBarnard } from './barnard/proxy.mjs';
 import { serveRegion } from './barnard/region-proxy.mjs';
 
 const assets = new Map([
+  ['/analytics.js', ['analytics.js', 'text/javascript']],
   ['/catalog-discovery.js', ['spherex-map/public/catalog-discovery.js', 'text/javascript']],
   ['/observations.js', ['spherex-map/public/observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['spherex-map/public/barnard-timelapse.js', 'text/javascript']],
@@ -38,6 +40,7 @@ export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
+  if (pathname === '/analytics-config' && request.method === 'GET') { serveAnalyticsConfig(request, response); return; }
   if (pathname === '/gaia-source' && request.method === 'GET') { await serveGaiaSource(url, response); return; }
   if (pathname === '/gaia-field' && request.method === 'GET') { await serveGaiaField(url, response); return; }
   if (pathname === '/chime-event' && request.method === 'GET') { await serveChimeEvent(url, response); return; }

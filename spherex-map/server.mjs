@@ -1,4 +1,5 @@
 import { serveNameResolve } from '../name-resolve.mjs';
+import { serveAnalyticsConfig } from '../analytics-config.mjs';
 import { serveGaiaSource } from '../gaia-source.mjs';
 import { serveGaiaField } from '../gaia-field.mjs';
 import { serveChimeEvent } from '../chime-event.mjs';
@@ -12,6 +13,7 @@ import { serveBarnard } from '../barnard/proxy.mjs';
 import { serveRegion } from '../barnard/region-proxy.mjs';
 
 const assets = new Map([
+  ['/analytics.js', ['../analytics.js', 'text/javascript']],
   ['/catalog-discovery.js', ['catalog-discovery.js', 'text/javascript']],
   ['/observations.js', ['observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['barnard-timelapse.js', 'text/javascript']],
@@ -32,6 +34,7 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
+  if (pathname === '/analytics-config' && request.method === 'GET') { serveAnalyticsConfig(request, response); return; }
   if (pathname === '/gaia-source' && request.method === 'GET') { await serveGaiaSource(url, response); return; }
   if (pathname === '/gaia-field' && request.method === 'GET') { await serveGaiaField(url, response); return; }
   if (pathname === '/chime-event' && request.method === 'GET') { await serveChimeEvent(url, response); return; }
@@ -62,7 +65,8 @@ const server = createServer(async (request, response) => {
   }
   try {
     const [path, type] = asset;
-    const source = path === 'vendor/aladin.js' ? './node_modules/aladin-lite/dist/aladin.js'
+    const source = path === '../analytics.js' ? '../analytics.js'
+      : path === 'vendor/aladin.js' ? './node_modules/aladin-lite/dist/aladin.js'
       : path.startsWith('vendor/') ? './node_modules/aladin-lite/' + path.slice(7)
       : './public/' + path;
     const body = await readFile(new URL(source, import.meta.url));

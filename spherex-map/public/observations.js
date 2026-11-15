@@ -36,6 +36,7 @@ export function setupObservations(viewer, A, closeInspector) {
   let previewRevision = 0;
   let failedFrame;
   let previewCache = new Map();
+  const pendingPreloads = new Set();
   let referencePreviewUrl;
   let activeCandidate;
   let sharedFeedbackUrl;
@@ -117,6 +118,8 @@ export function setupObservations(viewer, A, closeInspector) {
     previewRevision++;
     failedFrame = undefined;
     previewCache = new Map();
+    for (const preload of pendingPreloads) preload.removeAttribute('src');
+    pendingPreloads.clear();
     if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl);
     referencePreviewUrl = undefined;
     image.hidden = true;
@@ -154,14 +157,15 @@ export function setupObservations(viewer, A, closeInspector) {
     const url = residual ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(residual) : previewUrl(frame);
     if (!previewCache.has(url)) {
       const preload = new Image();
+      pendingPreloads.add(preload);
       preload.src = url;
       const cache = previewCache;
       let timeout;
       const deadline = new Promise((_, reject) => {
-        timeout = setTimeout(() => reject(new Error('Preview timed out')), 14000);
+        timeout = setTimeout(() => { preload.removeAttribute('src'); reject(new Error('Preview timed out')); }, 14000);
       });
       cache.set(url, Promise.race([preload.decode().then(() => preload.src), deadline])
-        .finally(() => clearTimeout(timeout)).catch(error => {
+        .finally(() => { clearTimeout(timeout); pendingPreloads.delete(preload); }).catch(error => {
           cache.delete(url);
           throw error;
         }));
@@ -173,6 +177,7 @@ export function setupObservations(viewer, A, closeInspector) {
     const frame = frames[index];
     if (!frame) return false;
     const revision = ++previewRevision;
+    if (!image.hidden) status.textContent = 'Loading observation…';
     try {
       const src = await loadPreview(frame, index);
       if (revision !== previewRevision) return false;

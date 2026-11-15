@@ -53,6 +53,27 @@
     <div class="quick-start"><span>START WITH</span><div id="quick-start-list"></div><details class="featured-targets"><summary>Featured targets</summary><div id="featured-targets-list"></div></details></div>
   </section>
 
+  <section id="spectral-guide" class="story-section spectral-guide" aria-labelledby="spectral-guide-title">
+    <p class="eyebrow">SPHEREx FIELD GUIDE</p>
+    <h2 id="spectral-guide-title">Explore a cloud</h2>
+    <label for="spectral-region">Region</label>
+    <select id="spectral-region" aria-label="Choose a molecular cloud region"></select>
+    <button id="spectral-cygnus-shortcut" class="spectral-feature-button" type="button">See the Cygnus X water map</button>
+    <p id="spectral-region-note" class="spectral-note"></p>
+    <figure id="spectral-published-result" hidden>
+      <a href="https://www.jpl.nasa.gov/images/pia26748-nasas-spherex-mission-maps-water-ice-throughout-cygnus-x/" target="_blank" rel="noopener noreferrer">
+        <img src="/cygnus-x-water-annotated.jpg" alt="Annotated NASA SPHEREx map of Cygnus X. A pointer identifies an example bright blue cloud lane as water ice (H₂O); the key explains that blue shows water ice across the map.">
+      </a>
+      <p class="spectral-map-explainer">The pointer marks one example. Blue cloud lanes across the map show where SPHEREx mapped water ice.</p>
+      <figcaption id="spectral-published-caption">Published SPHEREx result · Cygnus X. Blue: water ice. Orange: PAH emission. Not a live measurement at the map cursor.</figcaption>
+    </figure>
+    <div id="spectral-feature-list" role="group" aria-label="Molecular features"></div>
+    <p id="spectral-result-status" class="spectral-result-status" role="status" aria-live="polite">Choose a feature to see what published observations show for this region.</p>
+    <p id="spectral-feature-detail" class="spectral-note" aria-live="polite">Choose a feature to view its nearest SPHEREx wavelength.</p>
+    <a id="spectral-source" class="source-link" target="_blank" rel="noopener noreferrer" hidden>See the source ↗</a>
+    <p class="spectral-caveat">Band views show brightness, not a molecule map. Confirming a molecule needs calibrated spectra and quality checks. These ingredients do not prove life.</p>
+  </section>
+
   <nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Learn</button></nav>
   <section id="inspector" class="story-section" aria-label="Object details" hidden>
 <button id="close-inspector" class="story-close" type="button" aria-label="Close object details" hidden>×</button>

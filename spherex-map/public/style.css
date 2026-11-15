@@ -394,6 +394,22 @@ main.story-selected #panel-welcome { display:none; }
 #quick-start-list, #featured-targets-list { display:grid; gap:7px; }
 :is(#quick-start-list, #featured-targets-list) button { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:44px; padding:9px 12px; border:1px solid #dbe4ec; border-radius:9px; background:#fff; color:#263647; font:inherit; font-size:.82rem; text-align:left; cursor:pointer; transition:background-color .16s,border-color .16s; }
 :is(#quick-start-list, #featured-targets-list) button:hover { background:#edf5fc; border-color:#adc9e2; }
+.spectral-guide { border-top:1px solid #e3e9ef; padding-top:18px; }
+.spectral-guide h2 { font-size:1.2rem; }
+.spectral-guide label { display:block; margin:12px 0 6px; color:#61758c; font-size:.7rem; font-weight:700; }
+.spectral-guide select { width:100%; min-height:42px; padding:9px 11px; border:1px solid #d5dfe9; border-radius:8px; background:#fff; color:#263647; font:inherit; font-size:.82rem; }
+.spectral-guide .spectral-note { margin:10px 0; color:#52657a; font-size:.78rem; line-height:1.5; }
+#spectral-feature-list { display:grid; gap:7px; margin:12px 0; }
+.spectral-result-status { margin:10px 0; padding:10px 11px; border-left:3px solid #6677ea; border-radius:4px; background:#f1f3ff; color:#34416b; font-size:.75rem; line-height:1.5; }
+.spectral-feature-button { width:100%; min-height:40px; padding:8px 11px; border:1px solid #d5dfe9; border-radius:8px; background:#fff; color:#263647; font:inherit; font-size:.78rem; text-align:left; cursor:pointer; }
+.spectral-feature-button:hover:not(:disabled) { border-color:#7393e8; background:#f0f3ff; }
+.spectral-feature-button:disabled { opacity:.55; cursor:not-allowed; }
+.spectral-guide .spectral-caveat { padding:10px 11px; border-left:3px solid #f18b58; border-radius:4px; background:#fff7f2; color:#5c4b44; font-size:.72rem; line-height:1.5; }
+#spectral-source { margin:0 0 8px; font-size:.76rem; }
+#spectral-published-result { margin:8px 0 14px; }
+#spectral-published-result a { display:block; }
+#spectral-published-result img { display:block; width:100%; height:auto; border:1px solid #d5dfe9; border-radius:8px; background:#09101e; }
+#spectral-published-result figcaption { margin-top:6px; color:#61758c; font-size:.69rem; line-height:1.45; }
 #story-sidebar #inspector { padding-top:27px; }
 #story-sidebar #inspector h2 { margin-bottom:9px; }
 #story-sidebar #story-supplement { padding-top:0; }
@@ -492,3 +508,7 @@ main[data-state=search] #compare-instruction { top:auto; bottom:55px; }
 main:has(#search-popup:not([hidden])) > .controls { z-index:8; }
 
 main[data-stage=understand]:has(#inspector:not([hidden])) #barnard-panel { display:none; }
+#spectral-published-result > a { display:block; overflow:hidden; border-radius:8px; }
+#spectral-published-result > a img { display:block; width:100%; height:auto; border:1px solid #d5dfe9; border-radius:8px; background:#09101e; }
+.spectral-map-explainer { margin:6px 0; color:#344a61; font-size:.74rem; line-height:1.45; }
+@media (max-width:420px) { .spectral-map-callout { top:22%; left:42%; } .spectral-map-callout-label { font-size:.6rem; padding:3px 5px; } }

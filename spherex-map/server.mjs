@@ -25,6 +25,8 @@ const assets = new Map([
   ['/ui-state.js', ['ui-state.js', 'text/javascript']],
   ['/search.js', ['search.js', 'text/javascript']],
   ['/sky-data.js', ['sky-data.js', 'text/javascript']],
+  ['/spectral-guide.js', ['spectral-guide.js', 'text/javascript']],
+  ['/cygnus-x-water-annotated.jpg', ['cygnus-x-water-annotated.jpg', 'image/jpeg']],
   ['/style.css', ['style.css', 'text/css']],
   ['/irsa.properties', ['irsa.properties', 'text/plain']],
   ['/vendor/aladin.js', ['vendor/aladin.js', 'text/javascript']],

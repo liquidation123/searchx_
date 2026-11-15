@@ -1,0 +1,55 @@
+/* Workspace navigation keeps the map controls separate from the active story. */
+#story-sidebar { color-scheme:light; display:flex; flex-direction:column; overflow:visible; }
+#panel-body { overflow:auto; min-height:0; overscroll-behavior:contain; }
+main[data-state=search] .controls { z-index:6; }
+#panel-header {
+  flex:none; z-index:2; min-height:52px; border-radius:14px 14px 0 0; padding:4px 14px;
+  background:#172334; color:#e4ecf7; border-color:#30405a;
+}
+#panel-header button { min-width:44px; width:auto; min-height:44px; height:auto; color:#e4ecf7; }
+#panel-header button:hover { background:#2e425b; }
+#panel-drag-title { letter-spacing:.02em; font-size:.84rem; }
+main.story-open #panel-stages { display:flex !important; }
+#panel-stages { position:sticky; top:0; z-index:1; background:#fcfcfd; padding:6px 10px; }
+#panel-stages button { min-width:0; min-height:44px; padding-inline:3px; font-size:.77rem; color:#40566a; }
+#panel-stages button:hover { background:#f0f4f8; }
+#panel-stages button[aria-current=step] { background:#e5eff9; color:#11538e; }
+#panel-stages:has([data-stage=understand]:not([hidden])) #workspace-learn { display:none; }
+#story-sidebar :is(button,a,select,summary):focus-visible { outline:2px solid #2475bc; outline-offset:2px; }
+#workspace-discover, #workspace-compare-empty, #workspace-learn-empty { padding-bottom:16px; }
+#workspace-discover h2, #workspace-compare-empty h2, #workspace-learn-empty h2 { font-size:1.12rem; }
+#workspace-discover p, #workspace-compare-empty p, #workspace-learn-empty p { color:#40566a; font-size:.9rem; line-height:1.5; }
+#workspace-discover summary, #observe-advanced summary { cursor:pointer; min-height:44px; padding:11px 3px; font-size:.84rem; color:#40566a; }
+#references { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; margin:0 0 10px; }
+#references button, [data-return-discover], #advanced-controls button {
+  min-height:44px; padding:8px 10px; background:#f5f8fb; color:#253a52;
+  border:1px solid #d4dfe9; border-radius:7px; text-align:left; font:inherit; font-size:.83rem;
+}
+#references button:hover, [data-return-discover]:hover, #advanced-controls button:hover { background:#e7f1fb; }
+#advanced-controls { display:grid; gap:6px; }
+#story-sidebar #favourites-list button { min-height:44px; color:#253a52; }
+#story-sidebar #quiz-start { min-height:44px; background:#195590; color:#fff; border-color:#195590; }
+#story-sidebar #quiz-start:hover { background:#164675; }
+#panel-tools .tool-label { text-shadow:none; }
+#panel-tools select, #panel-tools #observation-center { min-height:44px; }
+#story-sidebar #object-id { display:none; }
+main:not([data-stage=discover]) #workspace-discover,
+main:not([data-stage=observe]) :is(#panel-tools, #barnard-panel),
+main:not([data-stage=discover]) #lesson,
+main[data-workspace-section] #panel-body > :not(#panel-stages, #workspace-compare-empty, #workspace-learn-empty) { display:none !important; }
+main[data-stage=discover]:has(#inspector:not([hidden])) #suggested-objects:not(:focus-within) #references { max-height:118px; overflow:auto; }
+#search-popup .suggestion { min-height:44px; }
+@media(max-width:850px) {
+  main.story-open:not(:has(#compare-open)) #navigation { width:min(400px, calc(100vw - 20px)); }
+  main { --workspace-height:min(55dvh, calc(100dvh - 132px)); }
+  #story-sidebar { max-height:var(--workspace-height); }
+  main.story-open .map-controls { bottom:calc(var(--workspace-height) + 8px); }
+  main.story-open .coordinates { bottom:calc(var(--workspace-height) + 57px); }
+  main.story-open #share-status { bottom:calc(var(--workspace-height) + 82px); }
+  main.story-open #navigation-status { display:block; z-index:11; }
+  main.story-open #navigation-status[hidden] { display:none; }
+}
+#observation-heading span { display:block; margin-top:4px; font-size:.76rem; font-weight:400; }
+@media(prefers-reduced-motion:reduce) {
+  #sky, #map-pins, #story-sidebar { transition:none; }
+}

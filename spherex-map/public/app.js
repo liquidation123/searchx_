@@ -669,7 +669,7 @@ async function start() {
     const reviewCandidates = document.createElement('button');
     reviewCandidates.type = 'button';
     reviewCandidates.textContent = 'Review candidates';
-    byId('observation-center').after(reviewCandidates);
+    byId('advanced-controls').append(reviewCandidates);
     function openSieveDemo(source = 'review candidates') {
       featureUsed('SIEVE demo', source);
       track('Object Explored', { object_id: sieveDemo.id, object_type: 'candidate', catalog: 'SIEVE demo' });

@@ -21,6 +21,8 @@ const assets = new Map([
   ['/observations.js', ['observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['barnard-timelapse.js', 'text/javascript']],
   ['/', ['index.html', 'text/html']],
+  ['/workspace.css', ['workspace.css', 'text/css']],
+  ['/workspace.js', ['workspace.js', 'text/javascript']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/ui-state.js', ['ui-state.js', 'text/javascript']],
   ['/search.js', ['search.js', 'text/javascript']],

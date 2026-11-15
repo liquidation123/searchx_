@@ -6,17 +6,19 @@
 <title>SearchX — Sky Explorer</title>
 <meta name="description" content="Explore the sky with optical imagery and SPHEREx infrared observations.">
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/workspace.css">
 <link rel="modulepreload" href="/vendor/aladin.js">
 <script type="module" src="/app.js"></script>
+<script type="module" src="/workspace.js"></script>
 <script defer src="/vercel-analytics.js"></script>
 </head>
 <body>
-<main aria-label="SearchX">
+<main aria-label="SearchX Observatory" data-stage="discover">
   <div id="sky" aria-label="Interactive astronomical sky map"></div>
   <div id="map-pins" role="group" aria-label="Objects on the map"></div>
   <div class="controls">
     <form id="navigation">
-      <div class="search-shell"><div class="search-input"><span aria-hidden="true" class="search-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4.5 4.5"></path></svg></span><input id="target" role="combobox" aria-label="Search the sky" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" autocomplete="off" placeholder="Search objects or coordinates"><button id="clear-search" type="button" aria-label="Clear search" hidden>×</button><button id="go" type="submit" aria-label="Search" title="Search">→</button></div><div id="search-popup" hidden><div id="suggestion-heading">DISCOVER THE SKY</div><div id="suggestions" role="listbox" aria-label="Search suggestions"></div><p id="search-hint" role="status" aria-live="polite"></p></div></div>
+      <div class="search-shell"><div class="search-input"><span aria-hidden="true" class="search-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4.5 4.5"></path></svg></span><input id="target" role="combobox" aria-label="Search the sky" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" autocomplete="off" placeholder="Search the sky"><button id="clear-search" type="button" aria-label="Clear search" hidden>×</button><button id="go" type="submit" aria-label="Search" title="Search">→</button></div><div id="search-popup" hidden><div id="suggestion-heading">DISCOVER THE SKY</div><div id="suggestions" role="listbox" aria-label="Search suggestions"></div><p id="search-hint" role="status" aria-live="polite"></p></div></div>
     </form>
     <button type="button" id="panel-open" aria-expanded="false" aria-controls="story-sidebar">Explore</button>
     <div class="map-controls" role="group" aria-label="Map navigation"><button type="button" id="share-view" disabled>Share view</button><button type="button" id="home" disabled title="Recenter">⌖ <span>Recenter</span></button><button type="button" id="map-zoom-in" aria-label="Zoom in">+</button><button type="button" id="map-zoom-out" aria-label="Zoom out">−</button></div>
@@ -24,22 +26,42 @@
   </div>
   <div id="notice" role="status">Starting the sky map…</div>
   <aside id="story-sidebar" aria-label="Explore panel"><header id="panel-header"><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><div id="panel-body">
-  <section id="panel-tools" class="panel-tools" aria-label="Sky controls"><label class="tool-label" for="survey">IMAGE</label>
+  <nav id="panel-stages" aria-label="Observatory sections">
+    <button type="button" data-stage="discover" aria-current="step">Discover</button>
+    <button type="button" data-stage="observe">Observe</button>
+    <button type="button" id="workspace-compare">Compare</button>
+    <button type="button" data-stage="understand" hidden>Learn</button>
+    <button type="button" id="workspace-learn">Learn</button>
+  </nav>
+  <section id="workspace-compare-empty" class="story-section" aria-labelledby="workspace-compare-title" hidden>
+    <h2 id="workspace-compare-title" tabindex="-1">Compare objects</h2>
+    <p>Two-object comparison is currently unavailable in this release.</p>
+    <button type="button" data-return-discover>Back to Discover</button>
+  </section>
+  <section id="workspace-learn-empty" class="story-section" aria-labelledby="workspace-learn-title" hidden>
+    <h2 id="workspace-learn-title" tabindex="-1">Learn about an object</h2>
+    <p>Choose a curated object in Discover to explore its science. Try the Orion Nebula, the Horsehead Nebula, or Andromeda to open a quiz.</p>
+    <button type="button" data-return-discover>Back to Discover</button>
+  </section>
+  <section id="panel-tools" class="panel-tools" aria-label="Observation controls">
+    <label class="tool-label" for="survey">Sky dataset</label>
     <select id="survey" aria-label="Sky image" disabled><option value="optical">Optical · DSS2</option><option value="infrared">Infrared · SPHEREx</option></select>
     <select id="channel" aria-label="Infrared wavelength" disabled hidden></select>
-    <details id="favourites"><summary>Favourites</summary><div id="favourites-list"></div></details>
-    <button type="button" id="barnard-select" aria-pressed="false" disabled>Pick a sky area</button>
-    <button type="button" id="barnard-shortcut" disabled hidden>Barnard’s Star</button>
-    <button type="button" id="observation-center" disabled>Observations here</button>
-    <details id="guide"><summary>Help</summary><div class="panel">
-      <p>Drag to move. Use + and − to zoom.</p>
-      <p>Optical shows visible light. Infrared shows SPHEREx data.</p>
-      <p>Dark spots can have many causes. Check nearby stars and dates before drawing conclusions.</p>
-      <p>Choose a map pin to learn more:</p><div id="references"></div>
-      <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">SPHEREx data ↗</a> · <a href="/vendor/LICENSE">Image viewer license</a></p>
-    </div></details>
+    <button type="button" id="observation-center" disabled>Observations at map center</button>
+    <details id="observe-advanced">
+      <summary>Advanced tools and sources</summary>
+      <div id="advanced-controls">
+        <button type="button" id="barnard-select" aria-pressed="false" disabled>Pick a sky area for a time-lapse</button>
+        <button type="button" id="barnard-shortcut" disabled hidden>Barnard’s Star</button>
+      </div>
+      <details id="guide"><summary>Sky map help</summary><div class="panel">
+        <p>Drag to move. Use + and − to zoom.</p>
+        <p>DSS2 shows visible light. Infrared shows SPHEREx data.</p>
+        <p>Check nearby stars and observation dates before drawing conclusions from image changes.</p>
+        <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">SPHEREx data ↗</a> · <a href="/vendor/LICENSE">Image viewer license</a></p>
+      </div></details>
+    </details>
   </section>
-  <nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Learn</button></nav>
   <section id="inspector" class="story-section" aria-label="Object details" hidden>
 <button id="close-inspector" class="story-close" type="button" aria-label="Close object details" hidden>×</button>
     <div class="inspector-content">
@@ -51,6 +73,14 @@
   <section id="lesson" class="story-section" aria-label="Learn about astronomy" hidden>
 <button id="close-lesson" class="story-close" type="button" aria-label="Close lesson">×</button>
     <div class="inspector-content"><span class="eyebrow">EXPLORE AN IDEA</span><h2 id="lesson-name"></h2><p id="lesson-body" class="intro"></p><a id="lesson-source" class="source-link" target="_blank" rel="noopener noreferrer">Read more at NASA <span aria-hidden="true">↗</span></a></div>
+  </section>
+  <section id="workspace-discover" class="story-section" aria-labelledby="workspace-discover-title">
+    <div id="discover-intro">
+      <h2 id="workspace-discover-title">Find an object</h2>
+      <p>Search by name, catalog ID, or coordinates. Try Orion Nebula, M31, or a visible map marker.</p>
+    </div>
+    <details id="suggested-objects"><summary>Suggested objects</summary><div id="references"></div></details>
+    <details id="favourites"><summary>Favourites</summary><div id="favourites-list"></div></details>
   </section>
   <section id="observation-panel" class="story-section" aria-labelledby="observation-heading" hidden>
     <button id="observation-close" class="section-close" type="button" aria-label="Close SPHEREx observations" hidden>×</button>

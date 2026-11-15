@@ -13,7 +13,7 @@ async function request(handler, path) {
   return response;
 }
 
-test('map release gate preserves the existing homepage until storage and flag are ready', async () => {
+test('map entry always opens while shared forms and invites require the release gate and storage', async () => {
   const previousFlag = process.env.SEARCHX_MAPS_ENABLED;
   const previousStore = process.env.MAP_SESSION_STORE_DIR;
   const previousVercel = process.env.VERCEL;
@@ -22,18 +22,25 @@ test('map release gate preserves the existing homepage until storage and flag ar
     delete process.env.SEARCHX_MAPS_ENABLED;
     process.env.MAP_SESSION_STORE_DIR = directory;
     const disabled = (await import('./server.mjs?maps-disabled')).default;
-    assert.match((await request(disabled, '/')).body, /href="\/observatory" aria-label="Explore the SearchX Observatory sky map"/);
-    assert.equal((await request(disabled, '/maps')).status, 404);
+    assert.match((await request(disabled, '/')).body, /href="\/maps" aria-label="Open SearchX sky maps"/);
+    const publicEntry = await request(disabled, '/maps');
+    assert.equal(publicEntry.status, 200);
+    assert.match(publicEntry.body, /Shared map invites are currently unavailable/);
+    assert.match(publicEntry.body, /href="\/observatory">Open Observatory/);
+    assert.doesNotMatch(publicEntry.body, /<script[^>]+map-start\.js/);
+    assert.equal((await request(disabled, '/map-start.js')).status, 404);
     assert.equal((await request(disabled, '/map-sessions/ABCDEFGHIJ')).status, 404);
 
     process.env.SEARCHX_MAPS_ENABLED = '1';
     process.env.VERCEL = '1';
     const withoutSharedStore = (await import('./server.mjs?maps-no-redis')).default;
-    assert.equal((await request(withoutSharedStore, '/maps')).status, 404);
+    assert.doesNotMatch((await request(withoutSharedStore, '/maps')).body, /<script[^>]+map-start\.js/);
     delete process.env.VERCEL;
     const enabled = (await import('./server.mjs?maps-enabled')).default;
-    assert.match((await request(enabled, '/')).body, /href="\/maps" aria-label="Create or join a SearchX sky map"/);
-    assert.equal((await request(enabled, '/maps')).status, 200);
+    const sharedEntry = await request(enabled, '/maps');
+    assert.equal(sharedEntry.status, 200);
+    assert.match(sharedEntry.body, /<script[^>]+map-start\.js/);
+    assert.match(sharedEntry.body, /<summary>Advanced Settings<\/summary>/);
     assert.equal((await request(enabled, '/map-start.js')).status, 200);
   } finally {
     if (previousFlag === undefined) delete process.env.SEARCHX_MAPS_ENABLED;

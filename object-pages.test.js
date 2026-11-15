@@ -15,12 +15,14 @@ test('curated pages have unique canonical metadata, citations and real survey pr
     assert.match(html, /Uncertainty<\/dt><dd>Not supplied for this navigation center/);
     assert.match(html, /do not establish a new SIEVE detection/);
     assert.match(html, /\/observatory\?ra=/);
+    assert.doesNotMatch(html, /href="\/maps"/);
     const image = imageForObject(item);
     assert.equal(new URL(image.url).hostname.endsWith('science.nasa.gov'), true);
     assert.equal(evidenceForObject(item).length, 4);
   }
   assert.match(objectsIndexPage(), /\/object\/m42/);
-  assert.equal((sitemapXml().match(/<loc>/g) ?? []).length, publicObjects.length + 4);
+  assert.equal((sitemapXml().match(/<loc>/g) ?? []).length, publicObjects.length + 3);
+  assert.doesNotMatch(sitemapXml(), /\/maps<\/loc>/);
   assert.equal(getPublicObject('unverified'), null);
 });
 

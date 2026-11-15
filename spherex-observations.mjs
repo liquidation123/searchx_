@@ -136,9 +136,9 @@ export async function queryObservations(ra, dec, { signal } = {}) {
         }
       }
     }
-    const results = (await Promise.all(collections.map(async collection => {
+    const settled = await Promise.allSettled(collections.map(async collection => {
       const initial = await query(collection);
-      if (initial.rowCount < maxRecords) return [initial];
+      if (initial.rowCount < maxRecords) return { results: [initial], partial: false };
       const end = Math.ceil(Date.now() / 86400000 + 40587);
       const start = collection === 'spherex_dr1' ? 60745 : 61176;
       const stop = collection === 'spherex_dr1' ? 61177 : end;
@@ -146,10 +146,19 @@ export async function queryObservations(ra, dec, { signal } = {}) {
       for (let day = start; day < stop; day += 60) {
         windows.push(query(collection, day + ' ' + Math.min(day + 60, stop)));
       }
-      return Promise.all(windows);
-    }))).flat();
-    const truncated = results.some(result => result.rowCount >= maxRecords);
+      const settledWindows = await Promise.allSettled(windows);
+      const partial = !windows.length || settledWindows.some(window => window.status === 'rejected');
+      const results = settledWindows.flatMap(window => window.status === 'fulfilled' ? [window.value] : []);
+      // A capped response still contains verified exposures that can fill failed windows.
+      if (partial) results.push(initial);
+      return { results, partial };
+    }));
+    const completed = settled.flatMap(collection => collection.status === 'fulfilled' ? [collection.value] : []);
+    const partial = completed.length < collections.length || completed.some(collection => collection.partial);
+    const results = completed.flatMap(collection => collection.results);
+    const truncated = partial || results.some(result => result.rowCount >= maxRecords);
     const frames = selectFrames(results.flatMap(result => result.frames));
+    if (partial && !frames.length) return { status: 'archive_unavailable', frames: [] };
     return { status: frames.length ? 'ready' : 'empty', frames, truncated };
   } catch {
     return { status: 'archive_unavailable', frames: [] };

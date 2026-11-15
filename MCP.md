@@ -26,8 +26,10 @@ Client configuration names differ; use the client's remote MCP instructions. The
 
 The catalog begins with M 42, M 31, M 1, and M 101. Catalog centers guide the map; they are not new astrometric measurements. Archive matches are positional and do not establish object identity, flux, variability, or a SIEVE detection. No physical distances or model-generated conclusions are returned. SPHEREx observations are queried at call time; no frames are claimed when IRSA returns none or is unavailable.
 
-The MCP endpoint uses the same Upstash Redis configuration as map invites (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `MAP_SESSION_SECRET`) for distributed per-IP rate limiting. It returns HTTP 503 until those variables are configured, and HTTP 429 above 30 requests/minute per client IP. Vercel overwrites `X-Forwarded-For` to prevent client spoofing; the stored rate-limit key is an HMAC of the address. Only the project's canonical hosts and same-origin browser requests are accepted. Consider a Vercel WAF rule for `/mcp` if traffic grows.
+The MCP endpoint uses the same Upstash Redis configuration as map invites (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `MAP_SESSION_SECRET`) for distributed per-IP rate limiting. The public route returns HTTP 404 until the release flag and shared store are configured; when enabled, it returns HTTP 429 above 30 requests/minute per client IP. Vercel overwrites `X-Forwarded-For` to prevent client spoofing; the stored rate-limit key is an HMAC of the address. Only the project's canonical hosts and same-origin browser requests are accepted. Consider a Vercel WAF rule for `/mcp` if traffic grows.
 
 ## Verification
 
 `mcp-server.test.js` starts an actual HTTP server and uses the official MCP client SDK to connect, list all five tools, and call each one. The observation test mocks the upstream IRSA response, so it verifies protocol wiring and an honest empty state rather than asserting live archive availability. After deployment, repeat the client test against the production URL and verify live IRSA behavior separately.
+
+The public `/mcp` route stays disabled unless `SEARCHX_MCP_ENABLED=1` and shared Redis storage is configured. Set the flag only after checking production credentials and a real remote client connection. The map feature flag is independent.

@@ -1,4 +1,4 @@
-import { parseProperties, references } from './sky-data.js';
+import { parseProperties, references, decodeView, encodeView, restoreView } from './sky-data.js';
 import { catalogQuery, search } from './search.js';
 import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
@@ -184,6 +184,34 @@ survey.addEventListener('change', () => {
   viewer.setBaseImageLayer(opticalLayer()); pointAt(...center, fov);
 });
 channel.addEventListener('change', applyChannel);
+byId('share-view').addEventListener('click', async () => {
+  const status = byId('share-status');
+  try {
+    const [ra, dec] = viewer.getRaDec();
+    const state = {ra: Number(((ra % 360 + 360) % 360).toPrecision(12)) % 360, dec: Number(dec.toPrecision(12)),
+      fov: Number(viewer.getFoV()[0].toPrecision(12)), survey: survey.value};
+    if (state.survey === 'infrared') state.channel = Number(channel.value);
+    const url = encodeView(location.href, state);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const input = document.createElement('textarea');
+      input.value = url; input.setAttribute('readonly', '');
+      input.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.append(input); input.select();
+      let copied = false;
+      try { copied = document.execCommand('copy'); } finally { input.remove(); byId('share-view').focus(); }
+      if (!copied) throw new Error('Copy unavailable');
+    }
+    status.textContent = 'View link copied.';
+  } catch {
+    status.textContent = 'Could not copy the view link. Check clipboard permissions and try again.';
+  }
+  status.hidden = false;
+  clearTimeout(status.dismissTimer);
+  status.dismissTimer = setTimeout(() => { status.hidden = true; }, 5000);
+});
 byId('copy-position').addEventListener('click', async () => {
   const status=byId('copy-status');
   try { await navigator.clipboard.writeText(`${selectedReference.ra}, ${selectedReference.dec}`); status.textContent=' Copied.'; }
@@ -631,13 +659,27 @@ async function start() {
     if (notice.textContent === 'Starting the sky map…') showNotice('');
     const wavelengths = await metadata;
     survey.disabled = false;
-    if (!wavelengths) { survey.options[1].textContent = 'SPHEREx · unavailable'; survey.options[1].disabled = true; return; }
-    wavelengths.forEach((wavelength, index) => {
+    if (!wavelengths) { survey.options[1].textContent = 'SPHEREx · unavailable'; survey.options[1].disabled = true; }
+    (wavelengths ?? []).forEach((wavelength, index) => {
       channel.add(new Option(`${wavelength.toFixed(3)} µm${blankFrames.has(index) ? ' · no image' : ''}`, index));
       channel.options[index].disabled = blankFrames.has(index);
     });
     channel.value = String(activeFrame);
     channel.disabled = true;
+    const shared = decodeView(location.search, wavelengths?.length ?? 102);
+    if (shared) {
+      const infraredUnavailable = shared.survey === 'infrared' && !wavelengths;
+      restoreView(infraredUnavailable ? {...shared, survey:'optical', channel:undefined} : shared, {
+        pointAt: (ra, dec, fov) => { pointAt(ra, dec, fov); rememberTarget(ra, dec, 'shared view', fov); },
+        setSurvey: (name, index) => {
+          if (name === 'infrared') channel.value = String(index);
+          survey.value = name;
+          survey.dispatchEvent(new Event('change'));
+        },
+      });
+      if (infraredUnavailable) showNotice('The shared infrared survey is unavailable. Showing the optical view.');
+    }
+    byId('share-view').disabled = false;
   } catch (error) {
     console.error(error);
     showNotice('The sky map couldn’t start. Reload the page and check that WebGL2 is enabled.');

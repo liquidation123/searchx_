@@ -1,10 +1,10 @@
 export const surveyRoot = 'https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube';
 export const references = [
-  { id: 'Barnard 33', name: 'Horsehead Nebula', ra: 85.24583, dec: -2.45833, fov: 1.25, description: 'A dark dust cloud silhouetted against the glowing gas of IC 434.', source: 'SIMBAD' },
-  { id: 'M 42', name: 'Orion Nebula', ra: 83.82208, dec: -5.39111, fov: 2, description: 'A nearby emission nebula and region of active star formation.', source: 'SIMBAD' },
-  { id: 'M 31', name: 'Andromeda Galaxy', ra: 10.684708, dec: 41.26875, fov: 4, description: 'A large spiral galaxy in the Local Group.', source: 'SIMBAD' },
-  { id: 'M 101', name: 'Pinwheel Galaxy', ra: 210.80227, dec: 54.34895, fov: 2, description: 'A face-on spiral galaxy in Ursa Major. The coordinates are the target position in the IRSA cutout tutorial.', source: 'IRSA / NED', url: 'https://caltech-ipac.github.io/irsa-tutorials/spherex-cutouts/' },
-  { id: 'M 1', name: 'Crab Nebula', ra: 83.6332, dec: 22.0145, fov: 0.6, description: 'The remnant of a supernova observed in 1054.', source: 'SIMBAD' },
+  { id: 'Barnard 33', name: 'Horsehead Nebula', ra: 85.24583, dec: -2.45833, fov: 1.25, description: 'A cloud of gas and dust that appears dark against the glowing gas behind it.', source: 'SIMBAD' },
+  { id: 'M 42', name: 'Orion Nebula', ra: 83.82208, dec: -5.39111, fov: 2, description: 'A nearby cloud of glowing gas and dust where new stars are forming.', source: 'SIMBAD' },
+  { id: 'M 31', name: 'Andromeda Galaxy', ra: 10.684708, dec: 41.26875, fov: 4, description: 'A spiral galaxy: a vast collection of stars, gas and dust held together by gravity.', source: 'SIMBAD' },
+  { id: 'M 101', name: 'Pinwheel Galaxy', ra: 210.80227, dec: 54.34895, fov: 2, description: 'A spiral galaxy seen nearly face-on. Its position is the target used in an IRSA cutout tutorial.', source: 'IRSA / NED', url: 'https://caltech-ipac.github.io/irsa-tutorials/spherex-cutouts/' },
+  { id: 'M 1', name: 'Crab Nebula', ra: 83.6332, dec: 22.0145, fov: 0.6, description: 'An expanding remnant of a star that exploded as a supernova in 1054.', source: 'SIMBAD' },
   { id: 'M 45', name: 'Pleiades', ra: 56.75, dec: 24.1167, fov: 3, description: 'An open cluster of young stars also called the Seven Sisters.', source: 'SIMBAD' },
   { id: 'M 51', name: 'Whirlpool Galaxy', ra: 202.4696, dec: 47.1952, fov: 0.8, description: 'A spiral galaxy interacting with a smaller companion.', source: 'SIMBAD' },
   { id: 'M 57', name: 'Ring Nebula', ra: 283.3962, dec: 33.0291, fov: 0.4, description: 'A shell of gas shed by a dying star.', source: 'SIMBAD' },
@@ -45,4 +45,42 @@ export function coordinates(input) {
     throw new Error('Use RA from 0° to <360° and Dec from −90° to +90°. For sexagesimal use HH:MM:SS ±DD:MM:SS.');
   }
   return angles;
+}
+
+// Shared links contain only a complete, validated map state.
+export function decodeView(search, channelCount = 102) {
+  const params = new URLSearchParams(search);
+  const keys = ['ra', 'dec', 'fov', 'survey', 'channel'];
+  if (!keys.some(key => params.has(key))) return null;
+  if (keys.some(key => params.getAll(key).length > 1)) return null;
+  const number = key => {
+    const value = params.get(key);
+    return value && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value) ? Number(value) : NaN;
+  };
+  const ra = number('ra'), dec = number('dec'), fov = number('fov');
+  const survey = params.get('survey');
+  if (!Number.isFinite(ra) || ra < 0 || ra >= 360 || !Number.isFinite(dec) || Math.abs(dec) > 90 ||
+      !Number.isFinite(fov) || fov <= 0 || fov > 180 || !['optical', 'infrared'].includes(survey)) return null;
+  if (survey === 'optical') return params.has('channel') ? null : {ra, dec, fov, survey};
+  const raw = params.get('channel');
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  const channel = Number(raw);
+  if (!Number.isSafeInteger(channel) || channel >= channelCount || [50, 51].includes(channel)) return null;
+  return {ra, dec, fov, survey, channel};
+}
+
+export function encodeView(base, state) {
+  const url = new URL(base);
+  url.search = ''; url.hash = '';
+  for (const key of ['ra', 'dec', 'fov', 'survey', 'channel']) {
+    if (state[key] !== undefined) url.searchParams.set(key, String(state[key]));
+  }
+  if (!decodeView(url.search)) throw new Error('Cannot share this sky view.');
+  return url.href;
+}
+
+export function restoreView(state, {pointAt, setSurvey}) {
+  if (!state) return;
+  setSurvey(state.survey, state.channel);
+  pointAt(state.ra, state.dec, state.fov);
 }

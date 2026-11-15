@@ -315,7 +315,11 @@ export function setupObservations(viewer, A, closeInspector) {
       }
       sequenceStatus = candidate?.summary ?? (frames.length === 1 ? 'One observation date found.' :
         frames.length + ' observation dates from the same detector.');
-      if (results.truncated) sequenceStatus += ' IRSA returned partial archive coverage.';
+      if (results.coverage) {
+        const label = results.coverage === 'curated' ? 'Curated fallback' : 'Cached timeline';
+        sequenceStatus += ' Archive search temporarily unavailable. ' + label +
+          ' · last verified ' + results.refreshedAt.slice(0, 10) + ' UTC.';
+      } else if (results.truncated) sequenceStatus += ' IRSA returned partial archive coverage.';
       status.textContent = sequenceStatus;
       imageStatus.hidden = false;
       imageStatus.textContent = 'Loading first SPHEREx image…';
@@ -353,7 +357,7 @@ export function setupObservations(viewer, A, closeInspector) {
       if (shown && !current.signal.aborted && autoplay && frames.length > 1) play.click();
     } catch {
       if (current.signal.aborted) return;
-      status.textContent = 'IRSA couldn’t return observations. Try again or choose another spot.';
+      status.textContent = 'Archive search temporarily unavailable. Try again or choose another spot.';
       byId('observation-retry').hidden = false;
       byId('observation-alternative').hidden = false;
     }

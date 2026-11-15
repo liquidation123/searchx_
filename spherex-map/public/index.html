@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/style.css">
 <link rel="modulepreload" href="/vendor/aladin.js">
 <script type="module" src="/app.js"></script>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script defer src="/vercel-analytics.js"></script>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
@@ -25,21 +25,13 @@
   </div>
   <div id="notice" role="status">Starting the sky map…</div>
   <aside id="story-sidebar" aria-label="Explore panel"><header id="panel-header"><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><div id="panel-body">
-  <section id="panel-tools" class="panel-tools" aria-label="Sky controls"><label class="tool-label" for="survey">IMAGE</label>
-    <select id="survey" aria-label="Sky image" disabled><option value="optical">Optical · DSS2</option><option value="infrared">Infrared · SPHEREx</option></select>
-    <select id="channel" aria-label="Infrared wavelength" disabled hidden></select>
-    <details id="favourites"><summary>Favourites</summary><div id="favourites-list"></div></details>
-    <button type="button" id="barnard-select" aria-pressed="false" disabled>Pick a sky area</button>
-    <button type="button" id="barnard-shortcut" disabled hidden>Barnard’s Star</button>
-    <button type="button" id="observation-center" disabled>Observations here</button>
-    <details id="guide"><summary>Help</summary><div class="panel">
-      <p>Drag to move. Use + and − to zoom.</p>
-      <p>Optical shows visible light. Infrared shows SPHEREx data.</p>
-      <p>Dark spots can have many causes. Check nearby stars and dates before drawing conclusions.</p>
-      <p>Choose a map pin to learn more:</p><div id="references"></div>
-      <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">SPHEREx data ↗</a> · <a href="/vendor/LICENSE">Image viewer license</a></p>
-    </div></details>
+  <section id="panel-welcome" aria-labelledby="welcome-title">
+    <p class="eyebrow">START EXPLORING</p>
+    <h2 id="welcome-title">Find something in the sky.</h2>
+    <p>Search above or choose a starting point. Select a sky marker to open its story.</p>
+    <div class="quick-start"><span>START WITH</span><div id="quick-start-list"></div></div>
   </section>
+
   <nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Learn</button></nav>
   <section id="inspector" class="story-section" aria-label="Object details" hidden>
 <button id="close-inspector" class="story-close" type="button" aria-label="Close object details" hidden>×</button>
@@ -54,6 +46,7 @@
     <div class="inspector-content"><span class="eyebrow">EXPLORE AN IDEA</span><h2 id="lesson-name"></h2><p id="lesson-body" class="intro"></p><a id="lesson-source" class="source-link" target="_blank" rel="noopener noreferrer">Read more at NASA <span aria-hidden="true">↗</span></a></div>
   </section>
   <section id="observation-panel" class="story-section" aria-labelledby="observation-heading" hidden>
+    <button id="observation-back" class="back-link" type="button" hidden>← Back to object</button>
     <button id="observation-close" class="section-close" type="button" aria-label="Close SPHEREx observations" hidden>×</button>
     <h2 id="observation-heading">A closer look <span> / SPHEREx DR1 and QR3</span></h2>
     <p id="observation-frame-note">Wavelength and angle can vary between images.</p>
@@ -120,7 +113,22 @@
       <a id="barnard-source" target="_blank" rel="noopener noreferrer">Source observation at NASA/IPAC IRSA</a>
     </div>
   </section>
-<section id="quiz" class="story-section" hidden aria-labelledby="quiz-heading"><button type="button" id="quiz-back" class="text-button">← Back to story</button><p class="eyebrow" id="quiz-progress"></p><h2 id="quiz-heading" tabindex="-1"></h2><div id="quiz-answers" class="quiz-answers"></div><p id="quiz-feedback" role="status" aria-live="polite"></p><button type="button" id="quiz-next" hidden>Continue →</button><p id="quiz-complete" hidden></p><button id="explore-another" type="button" hidden>Explore another object →</button></section><div id="story-action" hidden><button type="button" id="quiz-start">Observe <span aria-hidden="true">→</span></button></div></div><div id="panel-resize" role="separator" aria-label="Resize information panel" aria-orientation="vertical" tabindex="0" aria-valuemin="300" aria-valuemax="440" aria-valuenow="340"></div></aside>
+<section id="quiz" class="story-section" hidden aria-labelledby="quiz-heading"><button type="button" id="quiz-back" class="text-button">← Back to story</button><p class="eyebrow" id="quiz-progress"></p><h2 id="quiz-heading" tabindex="-1"></h2><div id="quiz-answers" class="quiz-answers"></div><p id="quiz-feedback" role="status" aria-live="polite"></p><button type="button" id="quiz-next" hidden>Continue →</button><p id="quiz-complete" hidden></p><button id="explore-another" type="button" hidden>Explore another object →</button></section><div id="story-action" hidden><button type="button" id="quiz-start">View observations <span aria-hidden="true">→</span></button></div>
+  <details id="panel-tools" class="panel-tools"><summary>View &amp; tools <span aria-hidden="true">⌄</span></summary><div class="panel-tools-content"><label class="tool-label" for="survey">SKY IMAGE</label>
+    <select id="survey" aria-label="Sky image" disabled><option value="optical">Optical · DSS2</option><option value="infrared">Infrared · SPHEREx</option></select>
+    <select id="channel" aria-label="Infrared wavelength" disabled hidden></select>
+    <details id="favourites"><summary>Favourites</summary><div id="favourites-list"></div></details>
+    <button type="button" id="barnard-select" aria-pressed="false" disabled>Inspect a sky area</button>
+    <button type="button" id="barnard-shortcut" disabled hidden>Barnard’s Star</button>
+    <button type="button" id="observation-center" disabled>Observations at map center</button>
+    <details id="guide"><summary>How to explore</summary><div class="panel">
+      <p>Drag to move. Use + and − to zoom.</p>
+      <p>Optical shows visible light. Infrared shows SPHEREx data.</p>
+      <p>Dark spots can have many causes. Check nearby stars and dates before drawing conclusions.</p>
+      <p>Choose a map pin to learn more:</p><div id="references"></div>
+      <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">SPHEREx data ↗</a> · <a href="/vendor/LICENSE">Image viewer license</a></p>
+    </div></details>
+  </div></details></div><div id="panel-resize" role="separator" aria-label="Resize information panel" aria-orientation="vertical" tabindex="0" aria-valuemin="300" aria-valuemax="440" aria-valuenow="380"></div></aside>
   <div class="coordinates"><output id="position"></output><a id="image-source" href="https://doi.org/10.26093/cds/aladin/ht9n-7r">DSS2 · STScI/NASA, CDS</a></div>
 </main>
 </body>

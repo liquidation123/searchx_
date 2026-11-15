@@ -19,6 +19,7 @@ import { serveRegion } from './barnard/region-proxy.mjs';
 
 const assets = new Map([
   ['/analytics.js', ['analytics.js', 'text/javascript']],
+  ['/favicon.svg', ['spherex-map/public/favicon.svg', 'image/svg+xml']],
   ['/landing.css', ['landing.css', 'text/css']],
   ['/landing.js', ['landing.js', 'text/javascript']],
   ['/daily-game.css', ['daily-game.css', 'text/css']],

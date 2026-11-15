@@ -56,12 +56,12 @@ function inspect(reference) {
   if (reference) { byId("guide").open = false; byId('lesson').hidden = true; }
 
   selectedReference = reference;
+  byId('panel-drag-title').textContent = reference?.name || 'Explore';
   byId('inspector').hidden = !reference;
   byId('story-supplement').hidden = !reference;
   byId('panel-stages').querySelector('[data-stage=understand]').hidden = !reference || !reviewedQuestions[reference.id];
   resetQuiz();
   setStage('discover');
-  byId('sheet-name').textContent = reference?.name || 'Selected object';
   syncState();
   for (const pin of byId('map-pins').children) {
     pin.setAttribute('aria-expanded', String(pin.dataset.reference === reference?.id));
@@ -112,7 +112,7 @@ function renderFavourites() {
     button.type = 'button'; button.textContent = item.name;
     button.addEventListener('click', () => {
       if (!viewer) { showNavigationStatus('The sky map is still starting.'); return; }
-      byId('favourites').open = false; byId('layers').open = false;
+      byId('favourites').open = false;
       if (item.source === 'CHIME/FRB Catalog 2') { void resolveChime(item.id); return; }
       const reference = references.find(entry => favouriteId(entry) === favouriteId(item)) ?? item;
       goToReference({...reference, fov: reference.fov ?? .25});
@@ -216,7 +216,10 @@ byId('close-inspector').addEventListener('click', () => {
   target.focus({preventScroll:true}); dismiss();
 });
 byId("guide").addEventListener("toggle", event => {
-  if (event.target.open) inspect(null);
+  if (event.target.open) {
+    byId('lesson').hidden = true;
+    byId('barnard-panel').hidden = true;
+  }
 });
 
 function opticalLayer() {
@@ -590,10 +593,20 @@ function setStage(stage, objectId = selectedReference?.id) {
 }
 for(const button of byId('panel-stages').querySelectorAll('button')) button.addEventListener('click',()=>setStage(button.dataset.stage));
 byId('explore-another').addEventListener('click',()=>{byId('panel-close').click();target.focus();render();});
-byId('panel-close').addEventListener('click',()=>{selectObservations?.close(); inspect(null); byId('lesson').hidden=true; byId('barnard-panel').hidden=true;});
+let panelRequested = false;
+function syncPanelVisibility() {
+  const storyVisible=['inspector','lesson','observation-panel','barnard-panel'].some(id=>!byId(id).hidden);
+  const open=panelRequested||storyVisible;
+  const main=document.querySelector('main');
+  main.classList.toggle('story-open',open);
+  main.classList.toggle('story-selected',storyVisible);
+  byId('panel-open').setAttribute('aria-expanded',String(open));
+}
+byId('panel-open').addEventListener('click',()=>{panelRequested=true;syncPanelVisibility();});
+byId('panel-close').addEventListener('click',()=>{panelRequested=false;selectObservations?.close(); inspect(null); byId('lesson').hidden=true; byId('barnard-panel').hidden=true; syncPanelVisibility();});
 const storyObserver = new MutationObserver(()=>{
-  const visible=['inspector','lesson','observation-panel','barnard-panel'].some(id=>!byId(id).hidden);
-  document.querySelector('main').classList.toggle('story-open',visible);
+  syncPanelVisibility();
+  const visible=document.querySelector('main').classList.contains('story-selected');
   byId('story-action').hidden=!visible || document.querySelector('main').dataset.stage==='understand' ||
     (document.querySelector('main').dataset.stage==='observe' && !reviewedQuestions[selectedReference?.id]);
 });
@@ -666,8 +679,21 @@ async function start() {
       pointAt(sieveDemo.ra, sieveDemo.dec, .2);
       void selectObservations(sieveDemo.ra, sieveDemo.dec, false, sieveDemo);
       setStage('observe', sieveDemo.id);
+      panelRequested = true;
+      syncPanelVisibility();
     }
     reviewCandidates.addEventListener('click', () => openSieveDemo());
+    const sharedReview = location.pathname.match(/^\/community-reviews\/([0-9a-f-]{36})$/i);
+    if (sharedReview) {
+      void (async () => {
+        try {
+          const report = await selectObservations.loadCommunityFeedback(sharedReview[1]);
+          if (report.candidate_id !== sieveDemo.id) throw new Error('This review belongs to a candidate that is not available in this build.');
+          openSieveDemo();
+          selectObservations.showCommunityFeedback(report);
+        } catch (error) { showNavigationStatus(error.message); }
+      })();
+    }
 
     const pins = [...references, barnardMarker, sieveDemo].map(reference => {
       const pin = document.createElement('button');
@@ -782,18 +808,8 @@ start();
 
 byId('observation-panel').append(byId('object-fields').closest('details'));
 byId('object-fields').closest('details').append(byId('observation-source'));
-let sheetDragged = false;
-byId('sheet-toggle').addEventListener('touchstart', event => { byId('sheet-toggle').dataset.startY = event.touches[0].clientY; }, {passive:true});
-byId('sheet-toggle').addEventListener('touchend', event => { const delta=event.changedTouches[0].clientY-Number(byId('sheet-toggle').dataset.startY); if(Math.abs(delta)<30)return; sheetDragged=true; const expanded=delta<0; document.querySelector('main').classList.toggle('sheet-expanded',expanded);byId('sheet-toggle').setAttribute('aria-expanded',String(expanded));byId('sheet-label').textContent=expanded?'Collapse ↓':'Expand ↑'; }, {passive:true});
-byId('sheet-toggle').addEventListener('click', event => {
-  if(sheetDragged){sheetDragged=false;return;}
-  const expanded = document.querySelector('main').classList.toggle('sheet-expanded');
-  event.currentTarget.setAttribute('aria-expanded', String(expanded));
-  byId('sheet-label').textContent = expanded ? 'Collapse ↓' : 'Expand ↑';
-});
-
 const panel=byId('story-sidebar'), main=document.querySelector('main');
-let panelWidth=340, floating=false, collapsed=false;
+let panelWidth=340, floating=false;
 function positionPanel(x,y) {
   const width = panel.offsetWidth, height = panel.offsetHeight;
   const maxX = Math.max(0, innerWidth - width), maxY = Math.max(0, innerHeight - height);
@@ -814,7 +830,6 @@ function dock() { floating=false;main.classList.remove('panel-floating');panel.s
 byId('panel-header').addEventListener('pointerdown',event=>{if(event.target.closest('button')||matchMedia('(max-width:850px)').matches)return;const startX=event.clientX,startY=event.clientY,rect=panel.getBoundingClientRect();let moved=false;const move=e=>{if(!moved&&Math.hypot(e.clientX-startX,e.clientY-startY)<6)return;moved=true;floating=true;main.classList.add('panel-floating');positionPanel(rect.left+e.clientX-startX,rect.top+e.clientY-startY);};const up=e=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);if(moved&&e.clientX<45)dock();};addEventListener('pointermove',move);addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('pointerdown',event=>{if(matchMedia('(max-width:850px)').matches)return;event.preventDefault();event.target.setPointerCapture(event.pointerId);const width=panelWidth,x=event.clientX;const move=e=>applyWidth(width+e.clientX-x);const up=()=>{event.target.removeEventListener('pointermove',move);event.target.removeEventListener('pointerup',up);};event.target.addEventListener('pointermove',move);event.target.addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();applyWidth(panelWidth+(event.key==='ArrowRight'?10:-10));}else if(event.key==='Home'||event.key==='End'){event.preventDefault();applyWidth(event.key==='Home'?300:440);}});
-byId('panel-collapse').addEventListener('click',()=>{collapsed=!collapsed;main.classList.toggle('panel-collapsed',collapsed);byId('panel-collapse').textContent=collapsed?'+':'−';byId('panel-collapse').setAttribute('aria-label',collapsed?'Restore panel':'Collapse panel');});
 addEventListener('resize',()=>{if(floating && matchMedia('(max-width:850px)').matches) dock(); else if(floating) positionPanel(panel.offsetLeft,panel.offsetTop);});
 new ResizeObserver(() => { if (floating && !matchMedia('(max-width:850px)').matches) positionPanel(panel.offsetLeft,panel.offsetTop); }).observe(panel);
 applyWidth(340);

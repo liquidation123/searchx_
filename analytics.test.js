@@ -29,10 +29,12 @@ test('campaign attribution follows a visitor from homepage to Observatory within
   assert.deepEqual(sessionAttribution({}, true, storage), {});
 });
 
-test('analytics configuration is disabled without a valid project token', () => {
+test('an existing Mixpanel token is dormant without explicit opt-in', () => {
   const previous = process.env.MIXPANEL_TOKEN;
+  const previousEnabled = process.env.MIXPANEL_ENABLED;
   const previousRegion = process.env.MIXPANEL_REGION;
-  delete process.env.MIXPANEL_TOKEN;
+  process.env.MIXPANEL_TOKEN = 'ExampleToken123456789';
+  delete process.env.MIXPANEL_ENABLED;
   process.env.MIXPANEL_REGION = 'EU';
   let body;
   const response = { writeHead(status, headers) {
@@ -43,9 +45,15 @@ test('analytics configuration is disabled without a valid project token', () => 
   try {
     serveAnalyticsConfig({ headers: { 'x-vercel-ip-country': 'CA' } }, response);
     assert.deepEqual(body, { token: null, region: 'EU', country: 'CA' });
+    process.env.MIXPANEL_ENABLED = 'true';
+    delete process.env.MIXPANEL_TOKEN;
+    serveAnalyticsConfig({ headers: {} }, response);
+    assert.equal(body.token, null);
   } finally {
     if (previous === undefined) delete process.env.MIXPANEL_TOKEN;
     else process.env.MIXPANEL_TOKEN = previous;
+    if (previousEnabled === undefined) delete process.env.MIXPANEL_ENABLED;
+    else process.env.MIXPANEL_ENABLED = previousEnabled;
     if (previousRegion === undefined) delete process.env.MIXPANEL_REGION;
     else process.env.MIXPANEL_REGION = previousRegion;
   }

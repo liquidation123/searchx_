@@ -1,6 +1,9 @@
 const archive = 'https://irsa.ipac.caltech.edu';
 const maxRecords = 1000;
 const collections = ['spherex_dr1', 'spherex_qr3'];
+const requestTimeoutMs = 8000;
+const overallTimeoutMs = 24000;
+const retryDelayMs = 250;
 export const spectralProduct = /^\/ibe\/data\/spherex\/(dr1|qr3)\/level2\/\d{4}W\d{2}_[A-Z0-9]+\/l2b-v\d+-\d{4}-\d+\/([1-6])\/level2_[A-Za-z0-9_-]+\.fits$/;
 
 export function exposureStart(mjd) {
@@ -81,8 +84,11 @@ export async function serveObservations(url, response) {
     send(400, { status: 'invalid_position' });
     return;
   }
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), overallTimeoutMs);
+  const onClose = () => { if (!response.writableEnded) controller.abort(); };
+  response.once('close', onClose);
   try {
-    const signal = AbortSignal.timeout(10000);
     async function query(collection, time) {
       const url = new URL('/SIA', archive);
       url.search = new URLSearchParams({
@@ -90,9 +96,31 @@ export async function serveObservations(url, response) {
         MAXREC: String(maxRecords), RESPONSEFORMAT: 'CSV',
       });
       if (time) url.searchParams.set('TIME', time);
-      const upstream = await fetch(url, { signal });
-      if (!upstream.ok) throw new Error('IRSA HTTP ' + upstream.status);
-      return exposureRows(await upstream.text(), ra, dec);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let upstream;
+        try {
+          const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(requestTimeoutMs)]);
+          upstream = await fetch(url, { signal });
+          if (upstream.ok) {
+            const csv = await upstream.text();
+            try { return exposureRows(csv, ra, dec); }
+            catch (error) { error.permanent = true; throw error; }
+          }
+          await upstream.body?.cancel();
+          if (![408, 429].includes(upstream.status) && upstream.status < 500) {
+            throw Object.assign(new Error('IRSA HTTP ' + upstream.status), {permanent: true});
+          }
+          throw new Error('IRSA HTTP ' + upstream.status);
+        } catch (error) {
+          if (controller.signal.aborted || error.permanent || attempt === 1) throw error;
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => { controller.signal.removeEventListener('abort', abort); resolve(); }, retryDelayMs);
+            const abort = () => { clearTimeout(timer); reject(controller.signal.reason); };
+            controller.signal.addEventListener('abort', abort, {once: true});
+            if (controller.signal.aborted) abort();
+          });
+        }
+      }
     }
     const results = (await Promise.all(collections.map(async collection => {
       const initial = await query(collection);
@@ -110,6 +138,10 @@ export async function serveObservations(url, response) {
     const frames = selectFrames(results.flatMap(result => result.frames));
     send(200, { status: frames.length ? 'ready' : 'empty', frames, truncated });
   } catch {
-    send(502, { status: 'archive_unavailable', frames: [] });
+    if (!response.destroyed) send(502, { status: 'archive_unavailable', frames: [] });
+  } finally {
+    clearTimeout(deadline);
+    response.removeListener('close', onClose);
+    controller.abort();
   }
 }

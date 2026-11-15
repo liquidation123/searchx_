@@ -11,6 +11,12 @@
     "node": ">=20"
   },
   "dependencies": {
-    "aladin-lite": "https://github.com/cds-astro/aladin-lite/releases/download/v3.8.1/aladin-lite-3.8.1.tgz"
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "aladin-lite": "https://github.com/cds-astro/aladin-lite/releases/download/v3.8.1/aladin-lite-3.8.1.tgz",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0"
   }
 }

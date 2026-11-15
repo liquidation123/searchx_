@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { createMapSessionHandler } from './map-sessions.mjs';
 import { serveObjectPage } from './object-pages.mjs';
+import { createSearchXMcpHandler } from './mcp-server.mjs';
 
 import { serveObservations } from './spherex-observations.mjs';
 import { serveBarnard } from './barnard/proxy.mjs';
@@ -42,9 +43,11 @@ const properties = await readFile(new URL("./spherex-map/public/irsa.properties"
 const irsa = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube";
 const port = Number(process.env.PORT ?? 5173);
 const serveMapSession = createMapSessionHandler();
+const serveMcp = createSearchXMcpHandler();
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (pathname === '/mcp') { await serveMcp(request, response); return; }
   if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/objects' || pathname.startsWith('/object/')) {
     serveObjectPage(request, response, pathname);
     return;

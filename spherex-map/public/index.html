@@ -15,34 +15,31 @@
   <div id="map-pins" role="group" aria-label="Objects on the map"></div>
   <div class="controls">
     <form id="navigation">
-      <div class="search-shell"><div class="search-input"><span aria-hidden="true" class="search-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4.5 4.5"></path></svg></span><input id="target" role="combobox" aria-label="Search the sky" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" autocomplete="off" placeholder="Try “show me the Crab Nebula”"><button id="clear-search" type="button" aria-label="Clear search" hidden>×</button><button id="go" type="submit" aria-label="Search" title="Search">→</button></div><div id="search-popup" hidden><div id="suggestion-heading">DISCOVER THE SKY</div><div id="suggestions" role="listbox" aria-label="Search suggestions"></div><p id="search-hint" role="status" aria-live="polite"></p></div></div>
+      <div class="search-shell"><div class="search-input"><span aria-hidden="true" class="search-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4.5 4.5"></path></svg></span><input id="target" role="combobox" aria-label="Search the sky" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" autocomplete="off" placeholder="Search objects or coordinates"><button id="clear-search" type="button" aria-label="Clear search" hidden>×</button><button id="go" type="submit" aria-label="Search" title="Search">→</button></div><div id="search-popup" hidden><div id="suggestion-heading">DISCOVER THE SKY</div><div id="suggestions" role="listbox" aria-label="Search suggestions"></div><p id="search-hint" role="status" aria-live="polite"></p></div></div>
     </form>
-    <details class="layers-menu" id="layers"><summary aria-label="Layers and view">◈ <span>Layers / View</span></summary><div class="tools"><label class="tool-label" for="survey">SKY VIEW</label>
-      <select id="survey" aria-label="Sky survey" disabled><option value="optical">DSS2 · Optical color</option><option value="infrared">SPHEREx · Infrared</option></select>
-      <select id="channel" aria-label="Infrared wavelength" disabled hidden></select>
-
-      <details id="favourites"><summary>★ Favourites</summary><div id="favourites-list"></div></details>
-      <button type="button" id="barnard-select" aria-pressed="false" disabled>Select region</button>
-      <button type="button" id="barnard-shortcut" disabled hidden>Barnard's Star</button>
-      <button type="button" id="observation-center" disabled>Observations at map center</button>
-      <details id="guide">
-        <summary aria-label="Help and imagery information">Help</summary>
-        <div class="panel">
-          <p>Drag to move across the sky. Use + and − to zoom. Use Recenter to return to your last target and its original zoom.</p>
-          <p>DSS2 shows optical color imagery; switch to SPHEREx to compare the same sky in infrared.</p><p>SPHEREx sees infrared light our eyes can’t see. Pick a wavelength to see which features stand out. Each setting shows a different wavelength of the same sky survey.</p>
-          <p>Select a labeled pin to learn about the object, or try one of these objects.</p><p><strong>About this image:</strong> HiPS imagery loads in tiles. The SPHEREx all-sky cube has a finite resolution (about 12.9 arcseconds per pixel); zooming further cannot reveal finer SPHEREx detail. Dark regions can have several causes; this display alone cannot identify missing data. <a href="https://irsa.ipac.caltech.edu/onlinehelp/spherex/spherex/visualization.html" target="_blank" rel="noopener noreferrer">About the data ↗</a></p>
-          <p>Click the sky or use Select region for a six-arcminute SPHEREx cutout. Observations here uses the map centre.</p>
-
-          <div id="references"></div>
-          <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">NASA / IPAC SPHEREx DR1</a> · <a href="https://github.com/cds-astro/aladin-lite/tree/v3.8.1">CDS Aladin Lite</a> · <a href="/vendor/LICENSE">License</a></p>
-        </div>
-      </details>
-    </div></details>
+    <button type="button" id="panel-open" aria-expanded="false" aria-controls="story-sidebar">Explore</button>
     <div class="map-controls" role="group" aria-label="Map navigation"><button type="button" id="share-view" disabled>Share view</button><button type="button" id="home" disabled title="Recenter">⌖ <span>Recenter</span></button><button type="button" id="map-zoom-in" aria-label="Zoom in">+</button><button type="button" id="map-zoom-out" aria-label="Zoom out">−</button></div>
     <p id="share-status" role="status" aria-live="polite" hidden></p><p id="navigation-status" role="status" hidden></p><p id="catalog-status" role="status" hidden></p>
   </div>
   <div id="notice" role="status">Starting the sky map…</div>
-  <aside id="story-sidebar" aria-label="Discovery panel"><button id="sheet-toggle" type="button" aria-expanded="false"><span id="sheet-name">Selected object</span> <span id="sheet-label">Expand ↑</span></button><header id="panel-header"><button id="panel-collapse" type="button" aria-label="Collapse panel">−</button><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Understand</button></nav><div id="panel-body"><section id="inspector" class="story-section" aria-label="Object details" hidden>
+  <aside id="story-sidebar" aria-label="Explore panel"><header id="panel-header"><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><div id="panel-body">
+  <section id="panel-tools" class="panel-tools" aria-label="Sky controls"><label class="tool-label" for="survey">IMAGE</label>
+    <select id="survey" aria-label="Sky image" disabled><option value="optical">Optical · DSS2</option><option value="infrared">Infrared · SPHEREx</option></select>
+    <select id="channel" aria-label="Infrared wavelength" disabled hidden></select>
+    <details id="favourites"><summary>Favourites</summary><div id="favourites-list"></div></details>
+    <button type="button" id="barnard-select" aria-pressed="false" disabled>Pick a sky area</button>
+    <button type="button" id="barnard-shortcut" disabled hidden>Barnard’s Star</button>
+    <button type="button" id="observation-center" disabled>Observations here</button>
+    <details id="guide"><summary>Help</summary><div class="panel">
+      <p>Drag to move. Use + and − to zoom.</p>
+      <p>Optical shows visible light. Infrared shows SPHEREx data.</p>
+      <p>Dark spots can have many causes. Check nearby stars and dates before drawing conclusions.</p>
+      <p>Choose a map pin to learn more:</p><div id="references"></div>
+      <p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">SPHEREx data ↗</a> · <a href="/vendor/LICENSE">Image viewer license</a></p>
+    </div></details>
+  </section>
+  <nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Learn</button></nav>
+  <section id="inspector" class="story-section" aria-label="Object details" hidden>
 <button id="close-inspector" class="story-close" type="button" aria-label="Close object details" hidden>×</button>
     <div class="inspector-content">
       <p class="eyebrow" id="object-type"></p><h2 id="object-name"></h2><p class="object-id" id="object-id"></p>
@@ -57,7 +54,7 @@
   <section id="observation-panel" class="story-section" aria-labelledby="observation-heading" hidden>
     <button id="observation-close" class="section-close" type="button" aria-label="Close SPHEREx observations" hidden>×</button>
     <h2 id="observation-heading">A closer look <span> / SPHEREx DR1 and QR3</span></h2>
-    <p id="observation-frame-note">Frames use one detector. Wavelength and image orientation can vary between exposures.</p>
+    <p id="observation-frame-note">Wavelength and angle can vary between images.</p>
     <p id="observation-position"></p>
     <p id="observation-status" role="status"></p><dl id="radio-fields" hidden></dl><a id="radio-source" target="_blank" rel="noopener noreferrer" hidden>Open CHIME/FRB Catalog 2 event ↗</a><details id="observation-available-dates" hidden><summary>Available observation dates and FITS files</summary><ul id="observation-date-list"></ul></details>
     <p id="observation-placeholder" role="status" hidden></p>
@@ -77,12 +74,12 @@
       <input id="observation-frame" type="range" min="0" max="0" value="0" aria-label="Observation date">
       <p><output id="observation-date"></output></p>
       <a id="observation-source" target="_blank" rel="noopener noreferrer">Source SPHEREx FITS at NASA/IPAC IRSA ↗</a>
-      <p>Previews show individual SPHEREx exposures. Brightness uses a shared scale across this sequence. Detector orientation and wavelength can vary across exposures. Use the FITS cutout for measurements.</p>
+      <p>Images use the same brightness scale. Angle and wavelength can vary. Use FITS files for measurements.</p>
     </div>
     <section id="community-feedback" class="community-feedback" hidden aria-labelledby="community-feedback-title">
       <p class="eyebrow">COMMUNITY REVIEW</p>
       <h3 id="community-feedback-title">Do you think this candidate is an anomaly?</h3>
-      <p class="community-feedback-help">Your response is a community opinion, not a scientific verdict. Add a note about what you noticed. Anyone with the review link can read both.</p>
+      <p class="community-feedback-help">Share your opinion and note. Anyone with your link can see both.</p>
       <form id="community-feedback-form">
         <fieldset class="community-votes"><legend>Your assessment</legend>
           <label><input type="radio" name="community-vote" value="anomaly" required><span>Yes, it could be</span></label>

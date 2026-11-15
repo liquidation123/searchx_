@@ -2,6 +2,7 @@ import { parseProperties, references } from './sky-data.js';
 import { catalogQuery, search } from './search.js';
 import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
+import { sieveDemo } from './sieve-demo.js';
 import { setupCatalogDiscovery } from './catalog-discovery.js';
 import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSelected, objectExplored, featureUsed, track } from '/analytics.js';
 
@@ -560,7 +561,21 @@ async function start() {
       if (survey.value === 'infrared' && Number(channel.value) === activeFrame && loadedFrames.has(activeFrame) && !notice.hidden) updateLoading();
     }).observe({ type: 'resource', buffered: true });
 
-    const pins = [...references, barnardMarker].map(reference => {
+    const reviewCandidates = document.createElement('button');
+    reviewCandidates.type = 'button';
+    reviewCandidates.textContent = 'Review candidates';
+    byId('observation-center').after(reviewCandidates);
+    function openSieveDemo(source = 'review candidates') {
+      featureUsed('SIEVE demo', source);
+      searchRevision++;
+      byId('lesson').hidden = true;
+      inspect(null);
+      pointAt(sieveDemo.ra, sieveDemo.dec, .2);
+      void selectObservations(sieveDemo.ra, sieveDemo.dec, false, sieveDemo);
+    }
+    reviewCandidates.addEventListener('click', () => openSieveDemo());
+
+    const pins = [...references, barnardMarker, sieveDemo].map(reference => {
       const pin = document.createElement('button');
       pin.className = 'map-pin';
       pin.type = 'button';
@@ -571,6 +586,7 @@ async function start() {
       label.textContent = reference.name;
       pin.append(label);
       pin.addEventListener('click', () => {
+        if (reference === sieveDemo) return openSieveDemo('map pin');
         searchRevision++;
         showNavigationStatus('');
         if (reference === barnardMarker) {

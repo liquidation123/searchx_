@@ -16,6 +16,7 @@ import { serveRegion } from './barnard/region-proxy.mjs';
 
 const assets = new Map([
   ['/analytics.js', ['analytics.js', 'text/javascript']],
+  ['/sieve-demo.js', ['spherex-map/public/sieve-demo.js', 'text/javascript']],
   ['/catalog-discovery.js', ['spherex-map/public/catalog-discovery.js', 'text/javascript']],
   ['/observations.js', ['spherex-map/public/observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['spherex-map/public/barnard-timelapse.js', 'text/javascript']],

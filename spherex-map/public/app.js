@@ -14,6 +14,7 @@ const survey = byId('survey');
 const opticalUrl = 'https://irsa.ipac.caltech.edu/data/hips/CDS/DSS2/color';
 const notice = byId('notice');
 const target = byId('target');
+const initialTarget = new URLSearchParams(location.search).get('target');
 const returnButton = byId('home');
 const exhibits = {
   'Barnard 33': {type:'DARK NEBULA', why:'The Horsehead is a cloud of dust and gas seen in silhouette against a brighter background, revealing how interstellar dust blocks visible light.', url:'https://science.nasa.gov/asset/hubble/the-horsehead-nebula/'},
@@ -454,6 +455,7 @@ byId('navigation').addEventListener('submit',event=>{
 });
 byId('clear-search').addEventListener('click',()=>{++searchRevision;target.value='';showNavigationStatus('');target.focus();render();});
 document.addEventListener('pointerdown',event=>{if(!byId('navigation').contains(event.target))dismiss();});
+if(initialTarget){target.value=initialTarget;byId('navigation').requestSubmit();}
 document.addEventListener('keydown',event=>{if(event.key!=='Escape'||!popup.hidden)return; if(!byId('inspector').hidden){byId('close-inspector').click();} else if(!byId('lesson').hidden){byId('close-lesson').click();} else if(byId('guide').open){byId('guide').open=false;byId('guide').querySelector('summary').focus();}});
 target.addEventListener('blur',()=>setTimeout(()=>{if(!byId('navigation').contains(document.activeElement))dismiss();},0));
 byId('close-lesson').addEventListener('click',()=>{byId('lesson').hidden=true;resetQuiz();target.focus({preventScroll:true});dismiss();});
@@ -611,6 +613,7 @@ for(const id of ['inspector','lesson','observation-panel','barnard-panel']) stor
 
 async function start() {
   try {
+
     const metadata = fetch('/irsa.properties').then(response => {
       if (!response.ok) throw new Error('Wavelength labels unavailable.');
       return response.text();

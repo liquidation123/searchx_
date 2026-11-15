@@ -13,11 +13,19 @@ import pg from 'pg';
 
 import { serveObservations } from './spherex-observations.mjs';
 import { serveBarnard } from './barnard/proxy.mjs';
+import { sieveDemo } from './spherex-map/public/sieve-demo.js';
 
 import { serveRegion } from './barnard/region-proxy.mjs';
 
 const assets = new Map([
   ['/analytics.js', ['analytics.js', 'text/javascript']],
+  ['/landing.css', ['landing.css', 'text/css']],
+  ['/landing.js', ['landing.js', 'text/javascript']],
+  ['/daily-game.css', ['daily-game.css', 'text/css']],
+  ['/daily-game.js', ['daily-game.js', 'text/javascript']],
+  ['/daily-game', ['daily-game.html', 'text/html']],
+  ['/rabbits/front.png', ['spherex-map/public/rabbits/front.png', 'image/png']],
+  ['/rabbits/back.png', ['spherex-map/public/rabbits/back.png', 'image/png']],
   ['/sieve-demo.js', ['spherex-map/public/sieve-demo.js', 'text/javascript']],
   ['/catalog-discovery.js', ['spherex-map/public/catalog-discovery.js', 'text/javascript']],
   ['/observations.js', ['spherex-map/public/observations.js', 'text/javascript']],
@@ -76,6 +84,7 @@ export default async function handler(request, response) {
           candidateName: String(context.candidateName ?? '').slice(0, 160),
           source: String(context.source ?? '').slice(0, 40),
           frames: Array.isArray(context.frames) ? context.frames.slice(0, 20).map(frame => ({ id: String(frame.id ?? '').slice(0, 100), observedAt: String(frame.observedAt ?? '').slice(0, 40) })) : [],
+          ...( ['low', 'medium', 'high'].includes(context.confidence) ? { confidence: context.confidence } : {}),
         };
         await feedbackPool.query('INSERT INTO community_feedback (id, candidate_id, vote, note, context) VALUES ($1, $2, $3, $4, $5)', [id, candidateId, vote, note, JSON.stringify(safeContext)]);
         sendJson(response, 201, { id }); return;
@@ -89,6 +98,19 @@ export default async function handler(request, response) {
     } catch (error) {
       sendJson(response, error.status ?? 500, { error: error.status ? error.message : 'Could not save this review.' }); return;
     }
+  }
+  if (pathname === '/game-data' && request.method === 'GET') {
+    const candidates = [sieveDemo].map(candidate => ({
+      id: candidate.id, name: candidate.name, source: 'SIEVE',
+      summary: candidate.summary, ra: candidate.ra, dec: candidate.dec,
+      sieveCommit: candidate.sieveCommit,
+      frames: candidate.frames.map(frame => ({
+        id: frame.id, observedAt: frame.observedAt, detector: frame.detector,
+        previewUrl: '/spherex-preview?product=' + encodeURIComponent(new URL(frame.cutoutUrl).pathname) + '&ra=' + candidate.ra + '&dec=' + candidate.dec,
+      })),
+    }));
+    sendJson(response, 200, { schemaVersion: 1, source: 'SIEVE', candidates });
+    return;
   }
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
   if (pathname === '/analytics-config' && request.method === 'GET') { serveAnalyticsConfig(request, response); return; }

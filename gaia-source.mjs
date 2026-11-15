@@ -11,9 +11,10 @@ export async function serveGaiaSource(url, response) {
     const rows = (await upstream.text()).trim().split(/\r?\n/);
     if (rows.length < 2) return send(200, {status:'not_found'});
     const [sourceId, raRaw, decRaw, magnitudeRaw] = rows[1].split(',');
-    const ra=Number(raRaw), dec=Number(decRaw), magnitude=Number(magnitudeRaw);
+    const ra=Number(raRaw), dec=Number(decRaw), magnitude=magnitudeRaw?.trim() ? Number(magnitudeRaw) : NaN;
     if (sourceId !== id || !Number.isFinite(ra) || !Number.isFinite(dec)) throw new Error('Unexpected Gaia result');
     send(200, {status:'found',source:{id:'Gaia DR3 '+id,name:'Gaia DR3 '+id,ra,dec,source:'Gaia DR3',category:'GAIA SOURCE',
+      gMagnitude:Number.isFinite(magnitude)?magnitude:null,
       description:Number.isFinite(magnitude)?`Gaia DR3 source · G magnitude ${magnitude.toFixed(2)}.`:'Source listed in Gaia DR3.',
       url:'https://gea.esac.esa.int/archive/'}});
   } catch { send(502,{status:'archive_unavailable'}); }

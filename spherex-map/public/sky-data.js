@@ -1,3 +1,8 @@
+export function hasSkyPosition(object) {
+  const { ra, dec } = object ?? {};
+  return Number.isFinite(ra) && ra >= 0 && ra < 360 && Number.isFinite(dec) && Math.abs(dec) <= 90;
+}
+
 export const surveyRoot = 'https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube';
 const archiveEpoch = 2026;
 function movingTarget(target, anchor, motion) {

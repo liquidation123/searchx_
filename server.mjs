@@ -31,6 +31,8 @@ const assets = new Map([
   ['/observatory', ['spherex-map/public/index.html', 'text/html']],
   ['/app.js', ['spherex-map/public/app.js', 'text/javascript']],
   ['/ui-state.js', ['spherex-map/public/ui-state.js', 'text/javascript']],
+  ['/comparison.js', ['spherex-map/public/comparison.js', 'text/javascript']],
+  ['/quiz-data.js', ['spherex-map/public/quiz-data.js', 'text/javascript']],
   ['/search.js', ['spherex-map/public/search.js', 'text/javascript']],
   ['/sky-data.js', ['spherex-map/public/sky-data.js', 'text/javascript']],
   ['/style.css', ['spherex-map/public/style.css', 'text/css']],

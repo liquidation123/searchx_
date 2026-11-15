@@ -53,10 +53,10 @@ function updatePosition() {
 }
 
 function inspect(reference) {
-  if (reference) { byId("guide").open = false; byId('lesson').hidden = true; }
+  if (reference) { byId('guide').open = false; byId('panel-tools').open = false; byId('lesson').hidden = true; }
 
   selectedReference = reference;
-  byId('panel-drag-title').textContent = reference?.name || 'Explore';
+  byId('panel-drag-title').textContent = reference ? 'Object story' : 'Explore';
   byId('inspector').hidden = !reference;
   byId('story-supplement').hidden = !reference;
   byId('panel-stages').querySelector('[data-stage=understand]').hidden = !reference || !reviewedQuestions[reference.id];
@@ -558,6 +558,7 @@ function showQuestion() {
 }
 byId('quiz-start').addEventListener('click',()=>setStage(document.querySelector('main').dataset.stage==='discover'?'observe':'understand'));
 byId('quiz-back').addEventListener('click',()=>setStage('observe'));
+byId('observation-back').addEventListener('click',()=>setStage('discover'));
 byId('quiz-next').addEventListener('click', () => {
   if (quizIndex + 1 < quizQuestions.length) {
     quizIndex++;
@@ -577,6 +578,7 @@ byId('quiz-next').addEventListener('click', () => {
 function setStage(stage, objectId = selectedReference?.id) {
   if(stage==='understand' && !reviewedQuestions[selectedReference?.id]) return;
   if (document.querySelector('main').dataset.stage !== stage) {
+    byId('panel-tools').open = false;
     featureUsed('panel stage', stage);
     if (stage === 'observe') track('Observation Viewed', { object_id: objectId });
   }
@@ -588,7 +590,8 @@ function setStage(stage, objectId = selectedReference?.id) {
     showQuestion();
   }
   for(const button of byId('panel-stages').querySelectorAll('button')) button.setAttribute('aria-current',button.dataset.stage===stage?'step':'false');
-  byId('quiz-start').innerHTML=stage==='discover'?'Observe <span aria-hidden="true">→</span>':'Understand <span aria-hidden="true">→</span>';
+  byId('observation-back').hidden = stage !== 'observe' || !selectedReference;
+  byId('quiz-start').innerHTML=stage==='discover'?'View observations <span aria-hidden="true">→</span>':'Test what you learned <span aria-hidden="true">→</span>';
   byId('story-action').hidden=stage==='understand' || (stage==='observe' && !reviewedQuestions[selectedReference?.id]);
 }
 for(const button of byId('panel-stages').querySelectorAll('button')) button.addEventListener('click',()=>setStage(button.dataset.stage));
@@ -603,7 +606,7 @@ function syncPanelVisibility() {
   byId('panel-open').setAttribute('aria-expanded',String(open));
 }
 byId('panel-open').addEventListener('click',()=>{panelRequested=true;syncPanelVisibility();});
-byId('panel-close').addEventListener('click',()=>{panelRequested=false;selectObservations?.close(); inspect(null); byId('lesson').hidden=true; byId('barnard-panel').hidden=true; syncPanelVisibility();});
+byId('panel-close').addEventListener('click',()=>{panelRequested=false;byId('panel-tools').open=false;selectObservations?.close(); inspect(null); byId('lesson').hidden=true; byId('barnard-panel').hidden=true; syncPanelVisibility();});
 const storyObserver = new MutationObserver(()=>{
   syncPanelVisibility();
   const visible=document.querySelector('main').classList.contains('story-selected');
@@ -758,6 +761,15 @@ async function start() {
       button.addEventListener('click', () => goToReference(reference));
       byId('references').append(button);
     }
+    for (const id of ['Barnard 33', 'M 42', 'M 31']) {
+      const reference = references.find(item => item.id === id);
+      if (!reference) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = reference.name + ' →';
+      button.addEventListener('click', () => goToReference(reference, 'starting point'));
+      byId('quick-start-list').append(button);
+    }
     const barnardShortcut = byId('barnard-shortcut');
     barnardShortcut.addEventListener('click', () => {
       if (!byId('observation-panel').hidden) byId('observation-close').click();
@@ -831,5 +843,8 @@ byId('panel-header').addEventListener('pointerdown',event=>{if(event.target.clos
 byId('panel-resize').addEventListener('pointerdown',event=>{if(matchMedia('(max-width:850px)').matches)return;event.preventDefault();event.target.setPointerCapture(event.pointerId);const width=panelWidth,x=event.clientX;const move=e=>applyWidth(width+e.clientX-x);const up=()=>{event.target.removeEventListener('pointermove',move);event.target.removeEventListener('pointerup',up);};event.target.addEventListener('pointermove',move);event.target.addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();applyWidth(panelWidth+(event.key==='ArrowRight'?10:-10));}else if(event.key==='Home'||event.key==='End'){event.preventDefault();applyWidth(event.key==='Home'?300:440);}});
 addEventListener('resize',()=>{if(floating && matchMedia('(max-width:850px)').matches) dock(); else if(floating) positionPanel(panel.offsetLeft,panel.offsetTop);});
-new ResizeObserver(() => { if (floating && !matchMedia('(max-width:850px)').matches) positionPanel(panel.offsetLeft,panel.offsetTop); }).observe(panel);
-applyWidth(340);
+new ResizeObserver(() => {
+  if (matchMedia('(max-width:850px)').matches) main.style.setProperty('--sheet-height',panel.getBoundingClientRect().height+'px');
+  else { main.style.removeProperty('--sheet-height'); if (floating) positionPanel(panel.offsetLeft,panel.offsetTop); }
+}).observe(panel);
+applyWidth(380);

@@ -10,6 +10,7 @@ import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSel
 
 import { setupBarnard } from './barnard-timelapse.js';
 import { spectralFeatures, spectralRegions, nearestWavelengthIndex } from './spectral-guide.js';
+import { cygnusWaterWcs, icrsToGalactic, galacticToIcrs, galacticToWaterImagePixel, relativeWaterSignal, waterSignalLabel } from './cygnus-water-map.js';
 
 const byId = id => document.getElementById(id);
 const channel = byId('channel');
@@ -125,6 +126,73 @@ function showNavigationStatus(message) {
   const status = byId('navigation-status');
   status.textContent = message;
   status.hidden = !message;
+}
+
+function setupCygnusWaterMap() {
+  const toggle = byId('water-map-toggle');
+  const card = byId('water-map-card');
+  const status = byId('water-map-status');
+  const canvas = document.createElement('canvas');
+  canvas.width = cygnusWaterWcs.NAXIS1;
+  canvas.height = cygnusWaterWcs.NAXIS2;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  const image = new Image();
+  image.src = '/cygnus-water-overlay.png';
+  image.addEventListener('load', () => context.drawImage(image, 0, 0));
+  let enabled = false;
+  let lastPoint = null;
+
+  function setEnabled(next) {
+    enabled = next;
+    toggle.setAttribute('aria-pressed', String(enabled));
+    card.hidden = !enabled;
+    if (enabled) {
+      try {
+        const layerImage = A.image('/cygnus-water-overlay.png', {
+          name: 'Cygnus X water ice · published figure', wcs: { ...cygnusWaterWcs }, imgFormat: 'png', opacity: 1,
+          successCallback: () => { status.textContent = 'Map loaded. Click two places on the colored layer to compare the relative signal.'; },
+          errorCallback: error => { console.error('Cygnus water image failed to load', error); status.textContent = `The published map image failed to load: ${error?.message ?? String(error)}`; },
+        });
+        status.textContent = 'Loading the published Cygnus map…';
+        viewer.setOverlayImageLayer(layerImage, 'cygnus-water-ice');
+        const center = galacticToIcrs(cygnusWaterWcs.CRVAL1, cygnusWaterWcs.CRVAL2);
+        pointAt(center.ra, center.dec, 6.5);
+        rememberTarget(center.ra, center.dec, 'Cygnus X', 6.5);
+        lastPoint = null;
+        status.textContent = 'Click inside the colored map to inspect a location.';
+      } catch (error) {
+        console.error('Could not add Cygnus water ice map', error);
+        setEnabled(false);
+        status.textContent = 'The water-ice layer could not be loaded. Please reload the page.';
+      }
+    } else {
+      viewer.removeImageLayer?.('cygnus-water-ice');
+      lastPoint = null;
+    }
+  }
+
+  toggle.addEventListener('click', () => setEnabled(!enabled));
+  byId('water-map-close').addEventListener('click', () => setEnabled(false));
+  viewer.on('click', ({ ra, dec, isDragging }) => {
+    if (!enabled || isDragging || !Number.isFinite(ra) || !Number.isFinite(dec)) return;
+    const galactic = icrsToGalactic(ra, dec);
+    const pixel = galacticToWaterImagePixel(galactic.lon, galactic.lat);
+    if (!pixel || !image.complete || !image.naturalWidth) {
+      status.textContent = 'That point is outside the published Cygnus X map. Click a colored area to inspect it.';
+      return;
+    }
+    const { data } = context.getImageData(pixel.x, pixel.y, 1, 1);
+    const signal = data[3] < 8 ? 0 : relativeWaterSignal(data[0], data[1], data[2]);
+    const label = waterSignalLabel(signal);
+    const clicked = { ra, dec, galactic, label };
+    if (lastPoint) {
+      status.textContent = `First: ${lastPoint.label} (l ${lastPoint.galactic.lon.toFixed(2)}°, b ${lastPoint.galactic.lat.toFixed(2)}°). Second: ${label} (l ${galactic.lon.toFixed(2)}°, b ${galactic.lat.toFixed(2)}°). Compare the relative color signal.`;
+      lastPoint = null;
+    } else {
+      status.textContent = `${label[0].toUpperCase() + label.slice(1)} relative map signal · l ${galactic.lon.toFixed(2)}°, b ${galactic.lat.toFixed(2)}° · RA ${ra.toFixed(3)}°, Dec ${dec.toFixed(3)}°. Click another point to compare.`;
+      lastPoint = clicked;
+    }
+  });
 }
 
 const positionText = (ra, dec) => `RA ${ra.toFixed(4)}° · Dec ${dec.toFixed(4)}°`;
@@ -780,6 +848,7 @@ async function start() {
       showProjectionControl: false, showFullscreenControl: false, showLayersControl: false,
       showReticle: false, survey: opticalLayer(), log: false,
     });
+    setupCygnusWaterMap();
     viewer.on('positionChanged', updatePosition);
     const openBarnard = setupBarnard(viewer, A, pointAt);
     selectObservations = setupObservations(viewer, A, () => { byId('lesson').hidden = true; inspect(null); });

@@ -25,7 +25,7 @@ export const spectralFeatures = [
 
 export const spectralRegions = [
   {
-    id: 'cygnus-x', name: 'Cygnus X', ra: 308.0, dec: 41.0, fov: 8,
+    id: 'cygnus-x', name: 'Cygnus X', ra: 307.6382, dec: 40.2918, fov: 7,
     note: 'A star-forming cloud with published SPHEREx maps of water ice, CO₂ ice, CO ice and PAH emission.',
     source: 'https://doi.org/10.3847/1538-4357/ae5180',
   },

@@ -26,6 +26,8 @@ const assets = new Map([
   ['/search.js', ['search.js', 'text/javascript']],
   ['/sky-data.js', ['sky-data.js', 'text/javascript']],
   ['/spectral-guide.js', ['spectral-guide.js', 'text/javascript']],
+  ['/cygnus-water-map.js', ['cygnus-water-map.js', 'text/javascript']],
+  ['/cygnus-water-overlay.png', ['cygnus-water-overlay.png', 'image/png']],
   ['/cygnus-x-water-annotated.jpg', ['cygnus-x-water-annotated.jpg', 'image/jpeg']],
   ['/style.css', ['style.css', 'text/css']],
   ['/irsa.properties', ['irsa.properties', 'text/plain']],

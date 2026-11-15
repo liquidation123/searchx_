@@ -22,9 +22,17 @@
     <button type="button" id="panel-open" aria-expanded="false" aria-controls="story-sidebar">Explore</button>
     <button type="button" id="compare-open" aria-controls="comparison-panel" aria-expanded="false">Compare</button>
     <div id="compare-instruction" hidden><span role="status">Choose Object <strong id="compare-destination"></strong> using search, a map marker, or the inspector.</span> <button type="button" id="compare-cancel">Cancel</button></div>
-    <div class="map-controls" role="group" aria-label="Map navigation"><button type="button" id="share-view" disabled>Share view</button><button type="button" id="home" disabled title="Recenter">⌖ <span>Recenter</span></button><button type="button" id="map-zoom-in" aria-label="Zoom in">+</button><button type="button" id="map-zoom-out" aria-label="Zoom out">−</button></div>
+    <div class="map-controls" role="group" aria-label="Map navigation"><button type="button" id="water-map-toggle" aria-pressed="false" aria-controls="water-map-card">Water ice</button><button type="button" id="share-view" disabled>Share view</button><button type="button" id="home" disabled title="Recenter">⌖ <span>Recenter</span></button><button type="button" id="map-zoom-in" aria-label="Zoom in">+</button><button type="button" id="map-zoom-out" aria-label="Zoom out">−</button></div>
     <p id="share-status" role="status" aria-live="polite" hidden></p><p id="navigation-status" role="status" hidden></p><p id="catalog-status" role="status" hidden></p>
   </div>
+  <aside id="water-map-card" aria-labelledby="water-map-title" hidden>
+    <button id="water-map-close" type="button" aria-label="Close water ice layer">×</button>
+    <p class="eyebrow">PUBLISHED SPHEREX MAP</p>
+    <h2 id="water-map-title">Cygnus X · Water ice</h2>
+    <p>Blue cloud lanes show stronger water ice absorption. Click two places on the map to compare.</p>
+    <p id="water-map-status" role="status" aria-live="polite">Click inside the colored map to inspect a location.</p>
+    <small>Relative signal from the published figure, not a new measurement. <a href="https://doi.org/10.3847/1538-4357/ae5180" target="_blank" rel="noopener noreferrer">Study and methods ↗</a></small>
+  </aside>
   <div id="notice" role="status">Starting the sky map…</div>
   <aside id="comparison-panel" aria-labelledby="compare-title" hidden>
     <header><h2 id="compare-title" tabindex="-1">Compare objects</h2><button type="button" id="compare-close" aria-label="Close comparison">×</button></header>

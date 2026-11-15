@@ -36,6 +36,8 @@ const assets = new Map([
   ['/search.js', ['spherex-map/public/search.js', 'text/javascript']],
   ['/sky-data.js', ['spherex-map/public/sky-data.js', 'text/javascript']],
   ['/spectral-guide.js', ['spherex-map/public/spectral-guide.js', 'text/javascript']],
+  ['/cygnus-water-map.js', ['spherex-map/public/cygnus-water-map.js', 'text/javascript']],
+  ['/cygnus-water-overlay.png', ['spherex-map/public/cygnus-water-overlay.png', 'image/png']],
   ['/cygnus-x-water-annotated.jpg', ['spherex-map/public/cygnus-x-water-annotated.jpg', 'image/jpeg']],
   ['/style.css', ['spherex-map/public/style.css', 'text/css']],
   ['/irsa.properties', ['spherex-map/public/irsa.properties', 'text/plain']],

@@ -13,7 +13,7 @@ async function request(handler, path) {
   return response;
 }
 
-test('map release gate preserves the existing homepage until storage and flag are ready', async () => {
+test('public dataset chooser is available while shared maps require the release flag and storage', async () => {
   const previousFlag = process.env.SEARCHX_MAPS_ENABLED;
   const previousStore = process.env.MAP_SESSION_STORE_DIR;
   const previousVercel = process.env.VERCEL;
@@ -22,7 +22,8 @@ test('map release gate preserves the existing homepage until storage and flag ar
     delete process.env.SEARCHX_MAPS_ENABLED;
     process.env.MAP_SESSION_STORE_DIR = directory;
     const disabled = (await import('./server.mjs?maps-disabled')).default;
-    assert.match((await request(disabled, '/')).body, /href="\/observatory" aria-label="Explore the SearchX Observatory sky map"/);
+    assert.match((await request(disabled, '/')).body, /href="\/sky-maps" aria-label="Explore the SearchX Observatory sky map"/);
+    assert.doesNotMatch((await request(disabled, '/sky-maps')).body, /href="\/maps"/);
     assert.equal((await request(disabled, '/maps')).status, 404);
     assert.equal((await request(disabled, '/map-sessions/ABCDEFGHIJ')).status, 404);
 
@@ -30,9 +31,11 @@ test('map release gate preserves the existing homepage until storage and flag ar
     process.env.VERCEL = '1';
     const withoutSharedStore = (await import('./server.mjs?maps-no-redis')).default;
     assert.equal((await request(withoutSharedStore, '/maps')).status, 404);
+    assert.doesNotMatch((await request(withoutSharedStore, '/sky-maps')).body, /href="\/maps"/);
     delete process.env.VERCEL;
     const enabled = (await import('./server.mjs?maps-enabled')).default;
-    assert.match((await request(enabled, '/')).body, /href="\/maps" aria-label="Create or join a SearchX sky map"/);
+    assert.match((await request(enabled, '/')).body, /href="\/sky-maps"/);
+    assert.match((await request(enabled, '/sky-maps')).body, /href="\/maps">Create or join a shared map/);
     assert.equal((await request(enabled, '/maps')).status, 200);
     assert.equal((await request(enabled, '/map-start.js')).status, 200);
   } finally {

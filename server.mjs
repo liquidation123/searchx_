@@ -28,6 +28,8 @@ const assets = new Map([
   ['/observations.js', ['spherex-map/public/observations.js', 'text/javascript']],
   ['/barnard-timelapse.js', ['spherex-map/public/barnard-timelapse.js', 'text/javascript']],
   ['/', ['index.html', 'text/html']],
+  ['/sky-maps', ['spherex-map/public/sky-maps.html', 'text/html']],
+  ['/map-datasets.js', ['spherex-map/public/map-datasets.js', 'text/javascript']],
   ['/observatory', ['spherex-map/public/index.html', 'text/html']],
   ['/app.js', ['spherex-map/public/app.js', 'text/javascript']],
   ['/ui-state.js', ['spherex-map/public/ui-state.js', 'text/javascript']],
@@ -160,11 +162,8 @@ export default async function handler(request, response) {
       : path.startsWith('vendor/') ? './node_modules/aladin-lite/' + path.slice(7)
       : './' + path;
     let body = await readFile(new URL(source, import.meta.url));
-    if (pathname === '/' && mapsEnabled) {
-      body = Buffer.from(body.toString().replace(
-        'href="/observatory" aria-label="Explore the SearchX Observatory sky map">Explore the sky map',
-        'href="/maps" aria-label="Create or join a SearchX sky map">Create / Join Map'
-      ));
+    if (pathname === '/sky-maps' && mapsEnabled) {
+      body = Buffer.from(body.toString().replace('<!-- map-session-entry -->', '<a href="/maps">Create or join a shared map</a>'));
     }
     response.writeHead(200, { 'Content-Type': type + '; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Content-Length': body.length });
     response.end(request.method === 'HEAD' ? undefined : body);

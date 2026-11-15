@@ -1,3 +1,4 @@
+import { datasetMode, selectMapView, shareDataset, skySurveys } from './map-datasets.js';
 import { hasSkyPosition, parseProperties, references, featuredTargets, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
 import { catalogIdentifier, catalogQuery, search, selectSkyTarget } from './search.js';
 import { questionsFor } from './quiz-data.js';
@@ -106,6 +107,7 @@ function setupSpectralGuide(wavelengths) {
 const blankFrames = new Set([50, 51]);
 const home = references[0];
 let mapSession = null;
+let mapMode = 'all';
 const loadedFrames = new Set();
 let viewer, A, layer, selectObservations;
 let showResolvedMarker = () => {};
@@ -406,7 +408,7 @@ byId('share-view').addEventListener('click', async () => {
     const [ra, dec] = viewer.getRaDec();
     const state = {ra: Number(((ra % 360 + 360) % 360).toPrecision(12)) % 360, dec: Number(dec.toPrecision(12)),
       fov: Number(viewer.getFoV()[0].toPrecision(12)), survey: survey.value};
-    if (state.survey === 'infrared') state.channel = Number(channel.value);
+    if (state.survey === 'infrared') state.channel = channel.value ? Number(channel.value) : activeFrame;
     const sharedUrl = new URL(encodeView(location.href, state));
     if (mapSession) sharedUrl.searchParams.set('map', mapSession.code);
     const url = sharedUrl.href;
@@ -768,17 +770,21 @@ async function start() {
         showNotice(`${error.message} You can create or join a map at /maps.`);
       }
     }
-    const metadata = fetch('/irsa.properties').then(response => {
+    mapMode = datasetMode(location.search, mapSession?.datasets);
+    const permittedSurveys = skySurveys(mapMode);
+    const metadata = permittedSurveys.includes('infrared') ? fetch('/irsa.properties').then(response => {
       if (!response.ok) throw new Error('Wavelength labels unavailable.');
       return response.text();
-    }).then(parseProperties).catch(() => null);
+    }).then(parseProperties).catch(() => null) : Promise.resolve(null);
     ({ default: A } = await import('/vendor/aladin.js'));
     await A.init;
+    const infraredOnly = mapMode === 'infrared';
+    if (infraredOnly) survey.value = 'infrared';
     viewer = A.aladin(byId('sky'), {
       target: `${home.ra} ${home.dec}`, fov: home.fov, cooFrame: 'ICRS',
       showSimbadPointerControl: false, showGotoControl: false, showShareControl: false,
       showProjectionControl: false, showFullscreenControl: false, showLayersControl: false,
-      showReticle: false, survey: opticalLayer(), log: false,
+      showReticle: false, survey: infraredOnly ? frameLayer(activeFrame) : opticalLayer(), log: false,
     });
     viewer.on('positionChanged', updatePosition);
     const openBarnard = setupBarnard(viewer, A, pointAt);
@@ -925,12 +931,13 @@ async function start() {
     updatePosition();
     if (notice.textContent === 'Starting the sky map…') showNotice('');
     const wavelengths = await metadata;
-    setupSpectralGuide(wavelengths);
-    survey.disabled = false;
-    if (!wavelengths) { survey.options[1].textContent = 'SPHEREx · unavailable'; survey.options[1].disabled = true; }
-    if (mapSession && mapSession.datasets !== 'all') {
-      for (const option of survey.options) option.disabled = option.disabled || !mapSession.datasets.includes(option.value);
+    byId('spectral-guide').hidden = !permittedSurveys.includes('infrared');
+    if (!byId('spectral-guide').hidden) setupSpectralGuide(wavelengths);
+    survey.disabled = permittedSurveys.length === 1;
+    for (const option of survey.options) {
+      option.disabled = !permittedSurveys.includes(option.value) || (option.value === 'infrared' && !wavelengths);
     }
+    if (!wavelengths && permittedSurveys.includes('infrared')) survey.options[1].textContent = 'SPHEREx · wavelength controls unavailable';
     (wavelengths ?? []).forEach((wavelength, index) => {
       channel.add(new Option(`${wavelength.toFixed(3)} µm${blankFrames.has(index) ? ' · no image' : ''}`, index));
       channel.options[index].disabled = blankFrames.has(index);
@@ -938,17 +945,27 @@ async function start() {
     channel.value = String(activeFrame);
     channel.disabled = true;
     const shared = decodeView(location.search, wavelengths?.length ?? 102) ?? mapSession?.view;
-    if (shared) {
-      const infraredUnavailable = shared.survey === 'infrared' && !wavelengths;
-      restoreView(infraredUnavailable ? {...shared, survey:'optical', channel:undefined} : shared, {
+    if (shared || infraredOnly) {
+      const requested = selectMapView(mapMode, shared ?? home, activeFrame);
+      const infraredUnavailable = requested.survey === 'infrared' && !wavelengths;
+      const view = infraredUnavailable && !infraredOnly
+        ? { ...requested, survey:'optical', channel:undefined } : requested;
+      restoreView(view, {
         pointAt: (ra, dec, fov) => { pointAt(ra, dec, fov); rememberTarget(ra, dec, 'shared view', fov); },
         setSurvey: (name, index) => {
-          if (name === 'infrared') channel.value = String(index);
           survey.value = name;
+          if (name === 'infrared' && !wavelengths) {
+            byId('image-source').textContent = 'SPHEREx DR1';
+            byId('image-source').href = 'https://doi.org/10.26131/IRSA679';
+            return;
+          }
+          if (name === 'infrared') channel.value = String(index);
           survey.dispatchEvent(new Event('change'));
         },
       });
-      if (infraredUnavailable) showNotice('The shared infrared survey is unavailable. Showing the optical view.');
+      if (infraredUnavailable) showNotice(infraredOnly
+        ? 'SPHEREx wavelength controls are unavailable. The default infrared channel is selected.'
+        : 'The shared infrared survey is unavailable. Showing the optical view.');
     }
     if (!shared && !invite && !sharedReview) {
       const slug = new URLSearchParams(location.search).get('target');

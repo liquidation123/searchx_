@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Choose an optical, infrared, or combined sky view in the SearchX Observatory.">
+  <title>Choose a sky map · SearchX</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    @font-face { font-family:Space; src:url('/fonts/space-grotesk-400.ttf') format('truetype'); font-display:swap; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:#f0eef5; background:radial-gradient(ellipse at 75% 4%, #221c32, #0c0c16 52%, #06060c); min-height:100vh; font:16px/1.5 Space, system-ui, sans-serif; }
+    main { width:min(930px, 100%); margin:auto; padding:32px clamp(20px, 5vw, 50px) 64px; }
+    nav { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
+    nav a { color:#d6cce8; }
+    nav a:first-child { color:#f0eef5; letter-spacing:.12em; margin-right:auto; text-decoration:none; }
+    h1 { font-size:clamp(2.25rem, 6vw, 4rem); line-height:1.05; letter-spacing:-.045em; margin:56px 0 12px; }
+    p { margin:0; color:#b9b5c8; }
+    .maps { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:30px; }
+    .map { display:grid; align-content:start; gap:8px; padding:20px 22px; color:inherit; text-decoration:none; border:1px solid #4b435c; border-radius:10px; background:#13131e; }
+    .map:hover { background:#1d1a29; border-color:#9b87b7; }
+    a:focus-visible { outline:2px solid #e1cdf7; outline-offset:4px; }
+    .primary { grid-column:1/-1; background:#201a2f; border-color:#9a81ba; padding:24px; }
+    .primary small { width:fit-content; color:#e7cffd; font-size:.78rem; }
+    h2 { margin:0; line-height:1.15; font-size:1.35rem; }
+    .action { color:#e9d5ff; padding-top:8px; }
+    footer { display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; font-size:.86rem; }
+    footer a { color:#cfc2e7; }
+    @media (max-width:560px) { .maps { grid-template-columns:1fr; } h1 { margin-top:38px; } }
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="SearchX navigation"><a href="/">SearchX</a><a href="/objects">Explore objects</a><!-- map-session-entry --></nav>
+  <h1>Choose a sky map</h1>
+  <p>Explore the same sky in visible light or infrared.</p>
+  <div class="maps">
+    <a class="map primary" href="/observatory?dataset=all">
+      <small>Recommended</small>
+      <h2>All datasets</h2>
+      <p>Switch between DSS2 optical and SPHEREx infrared at the same sky position. Search, compare objects, and explore available observations.</p>
+      <span class="action">Open the full Observatory →</span>
+    </a>
+    <a class="map" href="/observatory?dataset=optical">
+      <h2>DSS2 Optical</h2>
+      <p>Explore visible-light imagery from the Digitized Sky Survey in color.</p>
+      <span class="action">Open optical map →</span>
+    </a>
+    <a class="map" href="/observatory?dataset=infrared">
+      <h2>SPHEREx Infrared</h2>
+      <p>Explore NASA’s DR1 infrared sky cube by wavelength. View dated SPHEREx exposures where coverage is available.</p>
+      <span class="action">Open infrared map →</span>
+    </a>
+  </div>
+  <footer aria-label="Dataset sources">
+    <a href="https://doi.org/10.26093/cds/aladin/ht9n-7r">DSS2 imagery credits ↗</a>
+    <a href="https://irsa.ipac.caltech.edu/data/SPHEREx/docs/overview_dr1.html">NASA/IPAC SPHEREx DR1 ↗</a>
+  </footer>
+</main>
+</body>
+</html>

@@ -43,7 +43,25 @@ test('observatory includes required player elements and renders a streamed FITS 
   const preview = await request(base + '/spherex-preview?' + query);
   assert.equal(preview.status, 200);
   assert.equal(preview.headers.get('content-type'), 'image/svg+xml');
-  assert.match(await preview.text(), /<svg.*<path/);
+  const originalSvg = await preview.text();
+  assert.match(originalSvg, /<svg.*<path/);
+  const bounds = preview.headers.get('x-spherex-stretch');
+  let attemptsPreview = 0;
+  globalThis.fetch = async () => {
+    attemptsPreview++;
+    return attemptsPreview === 1 ? new Response(null, {status: 503}) : new Response(fits);
+  };
+  query.set('stretch', bounds);
+  const retried = await request(base + '/spherex-preview?' + query);
+  assert.equal(retried.status, 200);
+  assert.equal(attemptsPreview, 2);
+  assert.equal(await retried.text(), originalSvg);
+  let missingAttempts = 0;
+  globalThis.fetch = async () => { missingAttempts++; return new Response(null, {status: 404}); };
+  const missing = await request(base + '/spherex-preview?' + query);
+  assert.equal(missing.status, 502);
+  assert.equal(missingAttempts, 1);
+  query.delete('stretch');
   globalThis.fetch = async () => new Response(null, {status: 503});
   const unavailable = await request(base + '/spherex-preview?' + query);
   assert.equal(unavailable.status, 502);

@@ -31,7 +31,10 @@ test('region selection keeps the last decoded image and metadata when a preview 
     return elements.get(id);
   }
   let empty = false;
-  t.mock.method(globalThis, 'fetch', async url => String(url).includes('view=difference')
+  const previewRequests = [];
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (String(url).startsWith('/spherex-preview') && !String(url).includes('view=difference')) previewRequests.push(String(url));
+    return String(url).includes('view=difference')
     ? Response.json({images: ['<svg/>', null, '<svg/>']})
     : String(url).startsWith('/spherex-preview')
     ? new Response('preview', { headers: { 'X-SPHEREx-Stretch': '0,1' } })
@@ -39,7 +42,8 @@ test('region selection keeps the last decoded image and metadata when a preview 
       observedAt: '2025-09-0' + i + 'T01:02:03Z', mjd: 60919 + i, detector: 'SPHEREx-D2', release: 'DR1',
       sourceUrl: 'https://irsa.ipac.caltech.edu/frame' + i,
       cutoutUrl: 'https://irsa.ipac.caltech.edu/frame' + i + '?center=85,-2',
-    })) }));
+    })) });
+  });
   const oldDocument = globalThis.document;
   const oldImage = globalThis.Image;
   globalThis.document = { getElementById: element, createElement: () => Object.assign(new EventTarget(), { append() {} }) };
@@ -59,7 +63,8 @@ test('region selection keeps the last decoded image and metadata when a preview 
   await new Promise(resolve => setImmediate(resolve));
   const image = element('observation-image');
   const first = image.src;
-  assert.match(first, /frame1/);
+  assert.match(first, /^blob:/);
+  assert.equal(previewRequests.filter(url => url.includes('frame1')).length, 1);
   const toggle = element('observation-difference');
   assert.equal(toggle.checked, false);
   assert.equal(toggle.disabled, false);

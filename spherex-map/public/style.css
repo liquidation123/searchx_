@@ -311,7 +311,7 @@ main.quiz-open #story-sidebar>.story-section:not(#quiz), main.quiz-open #story-a
 #panel-stages button[aria-current=step]{color:#1762a9;background:#eaf2fa;font-weight:700;}
 main[data-stage=discover] #observation-panel,main[data-stage=observe] #inspector,main[data-stage=observe] #story-supplement,main[data-stage=understand] #inspector,main[data-stage=understand] #observation-panel,main[data-stage=understand] #story-supplement{display:none!important;}
 main[data-stage=discover] #story-supplement{padding-top:0;}
-main[data-stage=discover] #story-supplement .source-link{display:none;}
+
 main[data-stage=observe] #observation-panel{padding-bottom:12px;}
 main[data-stage=observe] #observation-panel>.evidence{margin:14px 0 20px;}
 #story-sidebar #observation-panel h2{font-size:.96rem;color:#61758c;}
@@ -352,3 +352,17 @@ main.panel-collapsed #panel-stages,main.panel-collapsed #panel-body,main.panel-c
   main.story-open #catalog-status{display:none}
   main.story-open #navigation-status{display:none}
 }
+
+#share-status { position:absolute; right:20px; bottom:100px; max-width:calc(100% - 40px); padding:8px 12px; color:#243446; background:#fafcfeef; border:1px solid #dce4ec; border-radius:8px; font-size:.78rem; pointer-events:none; }
+@media(max-width:700px) { main.story-open #share-status { bottom:calc(42dvh + 64px); } main.story-open:not(.sheet-expanded) #share-status { bottom:112px; } main.story-open.sheet-expanded #share-status { bottom:calc(80dvh + 64px); } }
+
+.object-summary { display:flex; align-items:flex-start; gap:8px; }
+.object-summary .intro { flex:1; }
+#favourite-toggle { flex:none; width:36px; height:36px; padding:0; border:0; border-radius:6px; background:transparent; color:#526b82; font-size:1.4rem; }
+#favourite-toggle:hover, #favourite-toggle:focus-visible { background:#eaf2fa; }
+#favourite-toggle[aria-pressed=true] { color:#a16a13; }
+#favourites summary { cursor:pointer; color:#40566a; padding:8px 0; font-size:.76rem; }
+#favourites-list { display:flex; flex-direction:column; gap:4px; max-height:30vh; overflow:auto; font-size:.75rem; color:#61758c; }
+#favourites-list button { text-align:left; }
+#favourite-feedback { font-size:.75rem; }
+@media(min-width:851px) { #story-sidebar { top:96px; max-height:calc(100dvh - 108px); } }

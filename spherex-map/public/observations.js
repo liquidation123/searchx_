@@ -33,6 +33,7 @@ export function setupObservations(viewer, A, closeInspector) {
   let previewRevision = 0;
   let failedFrame;
   let previewCache = new Map();
+  let referencePreviewUrl;
 
   function setZoom(value) {
     zoom = value;
@@ -57,6 +58,8 @@ export function setupObservations(viewer, A, closeInspector) {
     previewRevision++;
     failedFrame = undefined;
     previewCache = new Map();
+    if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl);
+    referencePreviewUrl = undefined;
     image.hidden = true;
     image.removeAttribute('src');
     cutout.removeAttribute('href');
@@ -257,11 +260,24 @@ export function setupObservations(viewer, A, closeInspector) {
           const response = await fetch(previewUrl(frames[reference]), { signal: current.signal });
           if (!response.ok) continue;
           const bounds = response.headers.get('X-SPHEREx-Stretch');
-          await response.arrayBuffer();
+          const blob = await response.blob();
           if (current.signal.aborted) return;
-          if (bounds) { stretch = bounds; break; }
+          if (bounds) {
+            stretch = bounds;
+            // The first response was rendered using these exact bounds. Reuse it
+            // for the corresponding stretched URL instead of fetching it again.
+            referencePreviewUrl = URL.createObjectURL(blob);
+            const preload = new Image();
+            preload.src = referencePreviewUrl;
+            await preload.decode();
+            if (current.signal.aborted) return;
+            previewCache.set(previewUrl(frames[reference]), Promise.resolve(referencePreviewUrl));
+            break;
+          }
         } catch {
           if (current.signal.aborted) return;
+          if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl);
+          referencePreviewUrl = undefined; stretch = undefined;
         }
       }
       slider.max = frames.length - 1;

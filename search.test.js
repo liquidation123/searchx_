@@ -14,3 +14,19 @@ test('invalid coordinates show an error',()=>assert.ok(search('400, 91').error))
 test('unknown terms do not invent a match',()=>assert.equal(search('zzqvxyz').results.length,0));
 test('upstream Horsehead entry has independent aliases and correct category',()=>{const r=search('Horsehead').results[0];assert.equal(r.id,'Barnard 33');assert.equal(r.category,'Nebula');assert.equal(search('B33').results[0].id,'Barnard 33')});
 test('upstream reference insertion preserves existing catalog mappings',()=>{assert.equal(search('M42').results[0].name,'Orion Nebula');assert.equal(search('M31').results[0].name,'Andromeda Galaxy');assert.equal(search('M101').results[0].name,'Pinwheel Galaxy')});
+
+test('resolves requested curated names and catalog IDs, including natural-language wrappers', () => {
+  for (const [query, id] of [
+    ['M45', 'M 45'], ['M51', 'M 51'], ['M57', 'M 57'], ['Barnard 33', 'Barnard 33'],
+    ['Please show me the Horsehead Nebula on the sky map', 'Barnard 33'],
+    ['Could you locate Andromeda please?', 'M 31'], ['show me 85.24583, −2.45833', 'coordinates'],
+  ]) {
+    const result = search(query);
+    assert.equal((result.exact ?? result.results[0])?.id, id, query);
+  }
+  assert.equal(search('Andromda').exact, undefined);
+  assert.equal(search('Andromda').results[0].id, 'M 31');
+  assert.equal(search('galaxy near the big dipper').ambiguous, true);
+  for (const query of ['M4', 'M50', 'NGC 6721', 'Barnard 32']) assert.deepEqual(search(query).results, [], query);
+  assert.ok(search('Find the').error || !search('Find the').exact);
+});

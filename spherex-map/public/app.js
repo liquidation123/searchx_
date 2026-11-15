@@ -1,5 +1,7 @@
-import { parseProperties, references, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
-import { catalogQuery, search } from './search.js';
+import { hasSkyPosition, parseProperties, references, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
+import { catalogIdentifier, catalogQuery, search, selectSkyTarget } from './search.js';
+import { questionsFor } from './quiz-data.js';
+import { setupComparison } from './comparison.js';
 import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
 import { sieveDemo } from './sieve-demo.js';
@@ -7,6 +9,10 @@ import { setupCatalogDiscovery } from './catalog-discovery.js';
 import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSelected, objectExplored, featureUsed, track } from '/analytics.js';
 
 import { barnardMarker, setupBarnard } from './barnard-timelapse.js';
+
+const barnardReference = { ...barnardMarker, source: 'SIMBAD', category: 'Red dwarf',
+  description: 'Nearby star with high proper motion. SearchX shows its historical NEOWISE time-lapse.',
+  url: 'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=Barnard%27s%20Star' };
 
 const byId = id => document.getElementById(id);
 const channel = byId('channel');
@@ -58,7 +64,7 @@ function inspect(reference) {
   byId('panel-drag-title').textContent = reference?.name || 'Explore';
   byId('inspector').hidden = !reference;
   byId('story-supplement').hidden = !reference;
-  byId('panel-stages').querySelector('[data-stage=understand]').hidden = !reference || !reviewedQuestions[reference.id];
+  byId('panel-stages').querySelector('[data-stage=understand]').hidden = !reference;
   resetQuiz();
   setStage('discover');
   syncState();
@@ -82,13 +88,46 @@ function inspect(reference) {
   byId('object-catalog').textContent = reference.source + ' · ' + reference.id;
   byId('object-position').textContent = positionText(reference.ra, reference.dec);
   byId('object-frame').textContent = 'Sky position · ' + (reference.radio ? 'J2000' : 'ICRS');
-  byId('object-source').href = reference.url ??
-    'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=' + encodeURIComponent(reference.id);
-  if (selectObservations) {
+  const link = byId('object-source');
+  link.hidden = reference.source === 'Entered coordinates';
+  link.href = referenceUrl(reference) ?? '#';
+  comparison.accept(comparable(reference));
+  if (selectObservations && reference.id !== barnardMarker.id) {
     if (reference.radio) selectObservations.radio(reference);
     else void selectObservations(reference.ra, reference.dec);
   }
 }
+
+function referenceUrl(reference) {
+  if (reference.source === 'Entered coordinates') return null;
+  return reference.url ?? 'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=' + encodeURIComponent(reference.id);
+}
+
+const curatedTypes = {
+  'M 1': 'Supernova remnant', 'M 45': 'Open star cluster', 'M 51': 'Spiral galaxy',
+  'M 57': 'Planetary nebula', 'eps Ind B': 'Brown dwarf binary',
+  'WISE J085510.83-071442.5': 'Brown dwarf', 'RW Aur': 'Young variable binary',
+  'R Dra': 'Long-period variable star',
+};
+
+function comparable(reference) {
+  if (!reference) return undefined;
+  const properties = [];
+  if (reference.radio) {
+    const { dm, subBursts } = reference.radio;
+    if (Number.isFinite(dm)) properties.push(['Dispersion measure', dm.toFixed(2) + ' pc cm⁻³']);
+    if (Number.isFinite(subBursts)) properties.push(['Published sub-bursts', String(subBursts)]);
+  }
+  if (Number.isFinite(reference.gMagnitude)) properties.push(['Gaia G magnitude', reference.gMagnitude.toFixed(2)]);
+  return { ...reference, classification: reference.source === 'Entered coordinates' ? null :
+    exhibits[reference.id]?.type ?? curatedTypes[reference.id] ?? reference.category,
+    url: referenceUrl(reference), properties };
+}
+
+const comparison = setupComparison({
+  focusSearch() { target.value = ''; target.focus(); render(); },
+  selectedObject: () => comparable(selectedReference),
+});
 
 const favouriteKey = 'searchx.favourites.v1';
 let favourites = [];
@@ -158,10 +197,9 @@ function goToReference(reference, source = 'shortcut') {
   showNavigationStatus('');
   byId('guide').open = false;
   target.value = reference.id;
-  pointAt(reference.ra, reference.dec, reference.fov);
-  rememberTarget(reference.ra, reference.dec, reference.id, reference.fov);
-  resultSelected(reference, source);
-  inspect(reference);
+  if (selectSkyTarget(reference, { point: pointAt, remember: rememberTarget, inspect })) {
+    resultSelected(reference, source);
+  }
 }
 
 function frameLayer(index) {
@@ -283,10 +321,10 @@ const list = byId('suggestions');
 let matches = [], active = -1;
 let submittedForInput = false;
 function dismiss() { popup.hidden = true; target.setAttribute('aria-expanded','false'); target.removeAttribute('aria-activedescendant'); active = -1; syncState(); }
-function render() {
-  const result = search(target.value); matches = result.results.slice(0, 6); active = -1;
+function render(override) {
+  const result = Array.isArray(override) ? { results: override } : search(target.value); matches = result.results.slice(0, 6); active = -1;
   const query = target.value.trim();
-  if (query && !result.error && !result.ambiguous && !matches.some(entry => entry.type === 'coordinates')) {
+  if (!Array.isArray(override) && query && !result.error && !result.exact && !matches.some(entry => entry.type === 'coordinates')) {
     matches.push({ type: 'catalog', name: 'Find “' + query + '” in the sky catalog',
       description: 'Search by name or describe an object in your own words', category: 'Catalog', query: catalogQuery(query) });
   }
@@ -311,10 +349,15 @@ function choose(entry) {
     if (count) resultsShown(count, 'local catalog');
     submittedForInput = true;
   }
-  if (entry.type === 'catalog') { resolveExternal(entry.query); return; }
+  if (entry.type === 'catalog') { resolveQuery(entry.query); return; }
+  if (entry.type === 'catalog-result') {
+    dismiss();
+    goToCatalogResult(entry.reference);
+    return;
+  }
   if (entry.type !== 'object') resultSelected(entry, 'search');
   const refresh = !byId('observation-panel').hidden;
-  if (refresh) selectObservations.close();
+  if (refresh) selectObservations?.close();
   if (!byId('barnard-panel').hidden) byId('barnard-close').click();
   ++searchRevision; dismiss(); showNavigationStatus(''); target.value=entry.name; byId('clear-search').hidden=false;
   if(entry.type==='action') { byId('barnard-shortcut').click(); return; }
@@ -326,7 +369,10 @@ function choose(entry) {
     target.value=entry.name;
     return;
   }
-  pointAt(...entry.position); rememberTarget(...entry.position,'coordinates'); inspect(null);
+  const [ra, dec] = entry.position;
+  goToReference({ id: entry.name, name: entry.name, ra, dec, fov: .5,
+    description: 'A sky position entered as right ascension and declination.',
+    source: 'Entered coordinates', category: 'Sky position' }, 'search');
 }
 async function resolveGaia(id) {
   const revision=++searchRevision;
@@ -338,8 +384,8 @@ async function resolveGaia(id) {
     if(result.status==='not_found'){noResults('not_found');showNavigationStatus('Gaia DR3 source not found. Check the identifier.');return;}
     if(!response.ok||result.status!=='found')throw new Error('Gaia unavailable');
     const reference=result.source;
-    pointAt(reference.ra,reference.dec,.25);rememberTarget(reference.ra,reference.dec,reference.id,.25);
-    resultsShown(1, 'Gaia DR3'); resultSelected(reference); showResolvedMarker(reference);inspect(reference);showNavigationStatus('Source from ESA Gaia DR3.');
+    resultsShown(1, 'Gaia DR3');
+    goToCatalogResult({ ...reference, fov: .25 });
   }catch{if(revision===searchRevision)showNavigationStatus('Gaia archive is unavailable. Try again later.');}
 }
 async function resolveChime(id) {
@@ -352,79 +398,94 @@ async function resolveChime(id) {
     if (result.status === 'not_found') { noResults('not_found'); showNavigationStatus('Event not found in CHIME/FRB Catalog 2.'); return; }
     if (!response.ok || result.status !== 'found') throw new Error('CHIME unavailable');
     const reference = result.source;
-    pointAt(reference.ra, reference.dec, Math.max(.2, 4 * Math.max(reference.radio.raError || 0, reference.radio.decError || 0)));
-    rememberTarget(reference.ra, reference.dec, reference.id);
-    resultsShown(1, 'CHIME/FRB Catalog 2'); resultSelected(reference); showResolvedMarker(reference); inspect(reference);
-    showNavigationStatus('Published CHIME/FRB Catalog 2 event.');
+    resultsShown(1, 'CHIME/FRB Catalog 2');
+    goToCatalogResult({ ...reference, fov: Math.max(.2, 4 * Math.max(reference.radio.raError || 0, reference.radio.decError || 0)) });
   } catch { if (revision === searchRevision) showNavigationStatus('CHIME/FRB Catalog 2 is unavailable. Try again later.'); }
 }
-function resolveExternal(query, useAi = true) {
-  if (!viewer || !A) {
-    showNavigationStatus('The sky map is still starting. Try again shortly.');
+function goToCatalogResult(reference) {
+  if (!hasSkyPosition(reference)) { showNavigationStatus('The catalog returned invalid coordinates.'); return; }
+  if (!byId('barnard-panel').hidden) byId('barnard-close').click();
+  showResolvedMarker(reference);
+  goToReference(reference, 'catalog');
+  target.value = reference.name;
+}
+
+function resolveQuery(query) {
+  const name = catalogQuery(query);
+  if (!viewer) { showNavigationStatus('The sky map is still starting. Try again shortly.'); return; }
+  if (!name || name.length > 120) {
+    showNavigationStatus('Enter an object name or catalog ID between 1 and 120 characters.');
     return;
   }
+  const identifier = catalogIdentifier(name);
+  if (identifier?.catalog === 'gaia') { void resolveGaia(identifier.id); return; }
+  if (identifier?.catalog === 'chime') { void resolveChime(identifier.id); return; }
+  if (/^(?:Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Europa|Ceres|Halley(?:'s)? comet)$/i.test(name)) {
+    dismiss();
+    showNavigationStatus('Moving objects need a date-specific ephemeris. Try a fixed object or coordinates.');
+    return;
+  }
+  void resolveExternal(name);
+}
+
+async function resolveExternal(query) {
   const revision = ++searchRevision;
-  showNavigationStatus('Searching the sky catalog…');
   dismiss();
+  showNavigationStatus('Searching CDS Sesame…');
 
   async function lookup(name) {
-    const response=await fetch('/name-resolve?name='+encodeURIComponent(name),{signal:AbortSignal.timeout(9000)});
-    if(!response.ok) throw new Error('Resolver unavailable');
-    const result=await response.json();
-    return result.status==='found' ? result.source : null;
+    const response = await fetch('/name-resolve?name=' + encodeURIComponent(name), { signal: AbortSignal.timeout(9000) });
+    if (!response.ok) throw new Error('Resolver unavailable');
+    const result = await response.json();
+    const candidates = result.status === 'ambiguous' ? result.candidates :
+      result.status === 'found' ? [result.source] : [];
+    return candidates.filter(hasSkyPosition);
   }
 
-  async function run() {
-    let name = query;
-    let position;
-    try { position = await lookup(name); } catch { if (revision === searchRevision) showNavigationStatus('Name resolver unavailable. Try again later or enter coordinates.'); return; }
-    if (revision !== searchRevision) return;
-    if (!position && useAi) {
-      showNavigationStatus('AI is interpreting your search…');
-      try {
-        const response = await fetch('/ai-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query }),
-          signal: AbortSignal.timeout(11000),
-        });
-        if (!response.ok) throw new Error('Search unavailable');
-        const result = await response.json();
-        if (revision !== searchRevision) return;
-        if (!result.target) {
-          noResults('not_found');
-          showNavigationStatus(result.message || 'Try adding an object name or a constellation.');
-          return;
-        }
-        name = result.target;
-        position = await lookup(name);
-      } catch {
-        if (revision === searchRevision) showNavigationStatus('No catalog position found for ' + name + '. AI search is unavailable; try an object name, catalog ID, or RA and Dec.');
-        return;
-      }
-    }
-    if (revision !== searchRevision) return;
-    const { ra, dec } = position ?? {};
-    if (!Number.isFinite(ra) || !Number.isFinite(dec) || ra < 0 || ra >= 360 || Math.abs(dec) > 90) {
-      noResults('not_found');
-      showNavigationStatus('No catalog position found for ' + name + '. Try a more specific query.');
-      return;
-    }
-    const refresh = !byId('observation-panel').hidden;
-    if (!byId('barnard-panel').hidden) byId('barnard-close').click();
-    pointAt(ra, dec);
-    rememberTarget(ra, dec, name);
-    const resolved = { id: position.id || name, name, ra, dec, source: 'CDS Sesame',
-      category: position.category || 'CATALOG SOURCE',
-      description: position.category ? 'Catalog classification: '+position.category+'.' : 'Catalog name resolved to this sky position; classification is unavailable.',
-      url: 'https://simbad.cfa.harvard.edu/simbad/sim-id?Ident=' + encodeURIComponent(position.id || name) };
-    resultsShown(1, 'CDS Sesame'); resultSelected(resolved); showResolvedMarker(resolved);
-    inspect(resolved);
-    byId('lesson').hidden = true;
-    syncState();
-    showNavigationStatus('Resolved ' + name + ' with CDS Sesame.');
+  let candidates;
+  try { candidates = await lookup(query); }
+  catch {
+    if (revision === searchRevision) showNavigationStatus('Name resolver unavailable. Try again later or enter coordinates.');
+    return;
   }
-  void run();
+  if (revision !== searchRevision) return;
+
+  let suggested = false;
+  if (!candidates.length) {
+    showNavigationStatus('No exact catalog match. Checking for a suggested object…');
+    try {
+      const response = await fetch('/ai-search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }), signal: AbortSignal.timeout(11000),
+      });
+      if (!response.ok) throw new Error('Suggestions unavailable');
+      const result = await response.json();
+      if (revision !== searchRevision) return;
+      if (result.target) { candidates = await lookup(result.target); suggested = true; }
+    } catch { /* A failed suggestion leaves the original search unresolved. */ }
+  }
+  if (revision !== searchRevision) return;
+  if (!candidates.length) {
+    noResults('not_found');
+    showNavigationStatus('No verified catalog match. Try a more specific name, catalog ID, or coordinates.');
+    return;
+  }
+  const options = candidates.slice(0, 6).map(position => {
+    const id = position.id || query;
+    const name = !suggested && candidates.length === 1 ? query : id;
+    const reference = { ...position, id, name, source: 'CDS Sesame', fov: .5,
+      description: position.category ? 'Catalog classification: ' + position.category + '.' :
+        'The catalog resolved this sky position without a classification.' };
+    return { type: 'catalog-result', name: name === id ? id : name + ' · ' + id, reference,
+      category: suggested ? 'Possible match' : 'CDS Sesame',
+      description: positionText(reference.ra, reference.dec) + ' · ' + reference.description };
+  });
+  resultsShown(options.length, 'CDS Sesame');
+  target.focus({ preventScroll: true });
+  render(options);
+  showNavigationStatus(candidates.length > 1 ? 'Catalogs returned different positions. Choose the result you mean.' :
+    suggested ? 'Check the suggested object before opening it.' : 'Select the catalog match to open it.');
+
 }
 target.addEventListener('focus',render);
 target.addEventListener('click',()=>{if(popup.hidden)render();});
@@ -436,12 +497,11 @@ target.addEventListener('keydown',event=>{
 byId('navigation').addEventListener('submit',event=>{
   event.preventDefault(); const query=target.value.trim(); if(!query){render();return;}
   searchSubmitted(query); submittedForInput = true;
-  const chime=query.match(/^(FRB\d{8}[A-Z])$/i); if(chime){void resolveChime(chime[1].toUpperCase());return;}
-  const gaia=query.match(/^Gaia\s+(?:DR3\s+)?(\d{1,19})$/i); if(gaia){void resolveGaia(gaia[1]);return;}
-  if(/^(?:Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Europa|Ceres|Halley(?:'s)? comet)$/i.test(query)){showNavigationStatus('Moving objects need a date-specific ephemeris; this sky map does not locate them yet.');dismiss();return;}
+  if (active >= 0 && !popup.hidden) { choose(matches[active]); return; }
+  if (matches[0]?.type === 'catalog-result' && !popup.hidden) { setActive(0); return; }
+  if (catalogIdentifier(query)) { resolveQuery(query); return; }
   const result=search(query); if(result.error){showNavigationStatus(result.error);render();return;}
   if (result.results.length) resultsShown(result.results.length, 'local catalog');
-  if(active>=0 && !popup.hidden){choose(matches[active]);return;}
   if(result.exact){choose(result.exact);return;}
   if(result.ambiguous){render();showNavigationStatus('Choose a result from the suggestions.');return;}
   if(result.results[0]?.type === 'coordinates'){choose(result.results[0]);return;}
@@ -450,7 +510,7 @@ byId('navigation').addEventListener('submit',event=>{
     showNavigationStatus('Choose a suggestion or search by description.');
     return;
   }
-  resolveExternal(catalogQuery(query));
+  resolveQuery(query);
 });
 byId('clear-search').addEventListener('click',()=>{++searchRevision;target.value='';showNavigationStatus('');target.focus();render();});
 document.addEventListener('pointerdown',event=>{if(!byId('navigation').contains(event.target))dismiss();});
@@ -459,60 +519,6 @@ target.addEventListener('blur',()=>setTimeout(()=>{if(!byId('navigation').contai
 byId('close-lesson').addEventListener('click',()=>{byId('lesson').hidden=true;resetQuiz();target.focus({preventScroll:true});dismiss();});
 
 
-const commonQuestions = [
-  {
-    question: 'What kind of light does SPHEREx observe?',
-    choices: ['Infrared light', 'Only visible light', 'Sound waves'],
-    correct: 0,
-    feedback: 'SPHEREx measures infrared light across many wavelengths.',
-  },
-  {
-    question: 'What changes when you pick a different SPHEREx wavelength?',
-    choices: ['The position on the sky', 'The band of infrared light you are viewing', 'The date of the exposure'],
-    correct: 1,
-    feedback: 'The wavelength control changes which band of infrared light is shown. The observation player shows exposures by date.',
-  },
-  {
-    question: 'What does an observation date tell you?',
-    choices: ['The exact age of the object', 'Whether the object moved', 'When the telescope took the exposure'],
-    correct: 2,
-    feedback: 'An observation date tells you when the light was recorded. You need more evidence to detect a change.',
-  },
-  {
-    question: 'What do right ascension (RA) and declination (Dec) give you?',
-    choices: ['A position on the sky', 'The distance from Earth', 'The temperature of an object'],
-    correct: 0,
-    feedback: 'RA and Dec are two angles that locate an object on the sky.',
-  },
-  {
-    question: 'What should you check if a star seems to shift between two dates?',
-    choices: ['Whether the newer image is brighter', 'Whether both previews are the same color', 'Whether nearby stars line up and the wavelengths are comparable'],
-    correct: 2,
-    feedback: 'Align the images using nearby stars and check the wavelengths before treating an apparent shift as motion.',
-  },
-];
-
-const objectQuestions = {
-  'M 42': {
-    question: 'Why do astronomers call the Orion Nebula a stellar nursery?',
-    choices: ['It is a galaxy full of old stars', 'New stars are forming in its gas and dust', 'Its stars all formed outside Orion'],
-    correct: 1,
-    feedback: 'The Orion Nebula contains young stars and clouds of gas and dust where stars are forming.',
-  },
-  'Barnard 33': {
-    question: 'Why does the Horsehead look dark in the optical image?',
-    choices: ['Its dust blocks light from the bright gas behind it', 'It is an empty patch of sky', 'All the stars in that field have gone out'],
-    correct: 0,
-    feedback: 'The Horsehead is a dusty cloud seen in silhouette against glowing gas.',
-  },
-  'M 31': {
-    question: 'What is Andromeda?',
-    choices: ['A nearby spiral galaxy', 'A single star', 'A SPHEREx detector'],
-    correct: 0,
-    feedback: 'Andromeda is a nearby spiral galaxy containing many stars.',
-  },
-};
-const reviewedQuestions = objectQuestions;
 let quizIndex = 0;
 let quizQuestions = [];
 function resetQuiz() {
@@ -530,6 +536,7 @@ function showQuestion() {
   byId('quiz-progress').textContent = 'QUESTION ' + (quizIndex + 1) + ' / ' + quizQuestions.length;
   byId('quiz-heading').textContent = question.question;
   byId('quiz-feedback').textContent = '';
+  byId('quiz-reference').hidden = true;
   byId('quiz-next').hidden = true;
 
   const answers = byId('quiz-answers');
@@ -545,6 +552,8 @@ function showQuestion() {
       button.classList.add(correct ? 'correct' : 'incorrect');
       answers.children[question.correct].classList.add('correct');
       byId('quiz-feedback').textContent = (correct ? 'Correct. ' : 'Not quite. ') + question.feedback;
+      byId('quiz-reference').href = question.reference;
+      byId('quiz-reference').hidden = false;
       byId('quiz-next').textContent = quizIndex === quizQuestions.length - 1 ? 'Finish quiz →' : 'Next question →';
       byId('quiz-next').hidden = false;
       byId('quiz-next').focus();
@@ -565,6 +574,7 @@ byId('quiz-next').addEventListener('click', () => {
   byId('quiz-heading').textContent = 'Well explored';
   byId('quiz-progress').textContent = 'COMPLETE';
   byId('quiz-feedback').textContent = '';
+  byId('quiz-reference').hidden = true;
   byId('quiz-next').hidden = true;
   byId('quiz-complete').textContent = quizQuestions.length + ' questions complete. Keep exploring the sky.';
   byId('quiz-complete').hidden = false;
@@ -572,7 +582,7 @@ byId('quiz-next').addEventListener('click', () => {
   byId('quiz-heading').focus();
 });
 function setStage(stage, objectId = selectedReference?.id) {
-  if(stage==='understand' && !reviewedQuestions[selectedReference?.id]) return;
+  if (stage === 'understand' && !selectedReference) return;
   if (document.querySelector('main').dataset.stage !== stage) {
     featureUsed('panel stage', stage);
     if (stage === 'observe') track('Observation Viewed', { object_id: objectId });
@@ -581,12 +591,20 @@ function setStage(stage, objectId = selectedReference?.id) {
   if (stage === 'understand' && !byId('quiz-complete').hidden) resetQuiz();
   byId('quiz').hidden = stage !== 'understand';
   if (stage === 'understand' && quizQuestions.length === 0) {
-    quizQuestions = [...commonQuestions, objectQuestions[selectedReference.id]];
-    showQuestion();
+    quizQuestions = questionsFor(selectedReference.id);
+    if (quizQuestions.length) showQuestion();
+    else {
+      byId('quiz-progress').textContent = '';
+      byId('quiz-heading').textContent = selectedReference.name;
+      byId('quiz-feedback').textContent = 'There is no reviewed quiz for this object yet. Use Observe to explore the available measurements and sources.';
+      byId('quiz-reference').hidden = true;
+      byId('quiz-next').hidden = true;
+      byId('quiz-heading').focus();
+    }
   }
   for(const button of byId('panel-stages').querySelectorAll('button')) button.setAttribute('aria-current',button.dataset.stage===stage?'step':'false');
   byId('quiz-start').innerHTML=stage==='discover'?'Observe <span aria-hidden="true">→</span>':'Understand <span aria-hidden="true">→</span>';
-  byId('story-action').hidden=stage==='understand' || (stage==='observe' && !reviewedQuestions[selectedReference?.id]);
+  byId('story-action').hidden=stage==='understand' || (stage==='observe' && !selectedReference);
 }
 for(const button of byId('panel-stages').querySelectorAll('button')) button.addEventListener('click',()=>setStage(button.dataset.stage));
 byId('explore-another').addEventListener('click',()=>{byId('panel-close').click();target.focus();render();});
@@ -605,7 +623,7 @@ const storyObserver = new MutationObserver(()=>{
   syncPanelVisibility();
   const visible=document.querySelector('main').classList.contains('story-selected');
   byId('story-action').hidden=!visible || document.querySelector('main').dataset.stage==='understand' ||
-    (document.querySelector('main').dataset.stage==='observe' && !reviewedQuestions[selectedReference?.id]);
+    (document.querySelector('main').dataset.stage==='observe' && !selectedReference);
 });
 for(const id of ['inspector','lesson','observation-panel','barnard-panel']) storyObserver.observe(byId(id),{attributes:true,attributeFilter:['hidden']});
 
@@ -696,15 +714,12 @@ async function start() {
         showNavigationStatus('');
         if (reference === barnardMarker) {
           featureUsed('Barnard time lapse', 'map pin');
-          byId('lesson').hidden = true;
-          if (!byId('observation-panel').hidden) byId('observation-close').click();
-          inspect(null);
-          selectObservations.close();
-          openBarnard();
+          byId('barnard-shortcut').click();
           return;
         }
         rememberTarget(reference.ra, reference.dec, reference === home ? 'Horsehead' : reference.id);
-        dismiss(); if (selectedReference?.id === reference.id) { selectObservations.close(); inspect(null); } else { resultSelected(reference, 'map'); inspect(reference); }
+        dismiss(); if (selectedReference?.id === reference.id && comparison.accept(comparable(reference))) return;
+        if (selectedReference?.id === reference.id) { selectObservations.close(); inspect(null); } else { resultSelected(reference, 'map'); inspect(reference); }
       });
       byId('map-pins').append(pin);
       return { pin, reference };
@@ -748,8 +763,10 @@ async function start() {
       if (!byId('observation-panel').hidden) byId('observation-close').click();
       searchRevision++;
       byId('lesson').hidden = true;
-      inspect(null);
+      dismiss();
       selectObservations.close();
+      inspect(barnardReference);
+      setStage('observe');
       openBarnard();
     });
     barnardShortcut.disabled = false;

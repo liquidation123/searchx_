@@ -1,3 +1,8 @@
+export function hasSkyPosition(object) {
+  const { ra, dec } = object ?? {};
+  return Number.isFinite(ra) && ra >= 0 && ra < 360 && Number.isFinite(dec) && Math.abs(dec) <= 90;
+}
+
 export const surveyRoot = 'https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube';
 export const references = [
   { id: 'Barnard 33', name: 'Horsehead Nebula', ra: 85.24583, dec: -2.45833, fov: 1.25, description: 'A cloud of gas and dust that appears dark against the glowing gas behind it.', source: 'SIMBAD' },

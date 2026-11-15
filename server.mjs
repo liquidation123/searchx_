@@ -8,6 +8,8 @@ import { servePreview } from './spherex-preview.mjs';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
+import { configuredMapStore, createMapSessionHandler } from './map-sessions.mjs';
+import { serveObjectPage } from './object-pages.mjs';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 
@@ -39,12 +41,19 @@ const assets = new Map([
   ['/vendor/aladin.js', ['vendor/aladin.js', 'text/javascript']],
   ...['LICENSE', 'COPYING', 'COPYING.LESSER'].map(name => ['/vendor/' + name, ['vendor/' + name, 'text/plain']]),
 ]);
+const mapStore = configuredMapStore();
+const mapsEnabled = process.env.SEARCHX_MAPS_ENABLED === '1' && !!mapStore;
+if (mapsEnabled) {
+  assets.set('/maps', ['map-start.html', 'text/html']);
+  assets.set('/map-start.js', ['map-start.js', 'text/javascript']);
+}
 for (const font of ['audiowide.ttf', 'michroma.ttf', 'space-grotesk-400.ttf']) {
   assets.set('/fonts/' + font, ['fonts/' + font, 'font/ttf']);
 }
 const properties = await readFile(new URL("./spherex-map/public/irsa.properties", import.meta.url), "utf8");
 const irsa = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube";
 const port = Number(process.env.PORT ?? 5173);
+const serveMapSession = createMapSessionHandler({ store: mapStore });
 const feedbackPool = process.env.DATABASE_URL ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 }) : null;
 async function readJson(request, maxBytes = 6000) {
   let body = '';
@@ -62,6 +71,14 @@ function sendJson(response, status, data) {
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  if (mapsEnabled && (pathname === '/map-sessions' || pathname.startsWith('/map-sessions/'))) {
+    await serveMapSession(request, response, pathname);
+    return;
+  }
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/objects' || pathname.startsWith('/object/')) {
+    serveObjectPage(request, response, pathname);
+    return;
+  }
   const feedbackMatch = pathname.match(/^\/community-feedback(?:\/([0-9a-f-]{36}))?$/i);
   if (feedbackMatch) {
     if (!feedbackPool) { sendJson(response, 503, { error: 'Community feedback storage is not configured.' }); return; }
@@ -135,7 +152,13 @@ export default async function handler(request, response) {
     const source = path === 'vendor/aladin.js' ? './node_modules/aladin-lite/dist/aladin.js'
       : path.startsWith('vendor/') ? './node_modules/aladin-lite/' + path.slice(7)
       : './' + path;
-    const body = await readFile(new URL(source, import.meta.url));
+    let body = await readFile(new URL(source, import.meta.url));
+    if (pathname === '/' && mapsEnabled) {
+      body = Buffer.from(body.toString().replace(
+        'href="/observatory" aria-label="Explore the SearchX Observatory sky map">Explore the sky map',
+        'href="/maps" aria-label="Create or join a SearchX sky map">Create / Join Map'
+      ));
+    }
     response.writeHead(200, { 'Content-Type': type + '; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Content-Length': body.length });
     response.end(request.method === 'HEAD' ? undefined : body);
   } catch (error) {

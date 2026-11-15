@@ -23,7 +23,7 @@ test('region selection keeps the last decoded image and metadata when a preview 
         removeAttribute: key => attrs.delete(key),
         getBoundingClientRect: () => ({ left: 0, top: 0 }),
         closest: () => null,
-        replaceChildren() {}, append() {},
+        replaceChildren() {}, append() {}, after() {}, reset() {},
         querySelector: () => element('observation-heading-span'),
         click: () => target.dispatchEvent(new Event('click')),
       });

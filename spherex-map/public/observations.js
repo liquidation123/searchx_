@@ -25,6 +25,9 @@ export function setupObservations(viewer, A, closeInspector) {
   const cutout = byId('observation-source');
   const image = byId('observation-image');
   const imageStatus = byId('observation-placeholder');
+  const feedbackSection = byId('community-feedback');
+  const feedbackForm = byId('community-feedback-form');
+  status.after(feedbackSection);
   const viewport = byId('observation-viewport');
   const zoomOut = byId('observation-zoom-out');
   const zoomIn = byId('observation-zoom-in');
@@ -35,6 +38,62 @@ export function setupObservations(viewer, A, closeInspector) {
   let previewCache = new Map();
   const pendingPreloads = new Set();
   let referencePreviewUrl;
+  let activeCandidate;
+  let sharedFeedbackUrl;
+
+  function resetCommunityFeedback(candidate) {
+    activeCandidate = candidate;
+    feedbackSection.hidden = !candidate;
+    feedbackForm.hidden = false;
+    feedbackForm.reset();
+    byId('community-feedback-submit').disabled = false;
+    byId('community-feedback-status').textContent = '';
+    byId('community-feedback-share').hidden = true;
+    byId('community-feedback-share-status').textContent = '';
+    byId('community-feedback-shared').hidden = true;
+    sharedFeedbackUrl = undefined;
+  }
+  feedbackForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!activeCandidate) return;
+    const vote = feedbackForm.querySelector('input[name="community-vote"]:checked')?.value;
+    if (!vote) { byId('community-feedback-status').textContent = 'Choose one response before saving.'; return; }
+    const submit = byId('community-feedback-submit');
+    submit.disabled = true;
+    byId('community-feedback-status').textContent = 'Saving your response…';
+    const context = {
+      ra: activeCandidate.ra, dec: activeCandidate.dec, candidateName: activeCandidate.name,
+      source: activeCandidate.sieveCommit ? 'SIEVE' : 'candidate',
+      frames: (activeCandidate.frames ?? []).map(frame => ({ id: frame.id, observedAt: frame.observedAt })),
+    };
+    try {
+      const response = await fetch('/community-feedback', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidateId: activeCandidate.id, vote, note: byId('community-note').value, context }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not save your response.');
+      sharedFeedbackUrl = new URL('/community-reviews/' + result.id, location.origin).href;
+      byId('community-feedback-url').value = sharedFeedbackUrl;
+      byId('community-feedback-status').textContent = 'Your response is saved.';
+      byId('community-feedback-share').hidden = false;
+    } catch (error) {
+      submit.disabled = false;
+      byId('community-feedback-status').textContent = error.message;
+    }
+  });
+  byId('community-feedback-share-button').addEventListener('click', async () => {
+    if (!sharedFeedbackUrl) return;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Community review of a SIEVE candidate', text: 'Take a look at this candidate and community review.', url: sharedFeedbackUrl });
+      else { await navigator.clipboard.writeText(sharedFeedbackUrl); byId('community-feedback-share-status').textContent = ' Link copied.'; }
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      try { await navigator.clipboard.writeText(sharedFeedbackUrl); byId('community-feedback-share-status').textContent = ' Link copied.'; }
+      catch { byId('community-feedback-share-status').textContent = ' Copy unavailable; select and copy the link above.'; }
+    }
+  });
+  byId('community-feedback-url').addEventListener('focus', event => event.currentTarget.select());
 
   function setZoom(value) {
     zoom = value;
@@ -212,6 +271,7 @@ export function setupObservations(viewer, A, closeInspector) {
     const current = new AbortController();
     request = current;
     selected = [ra, dec, false, candidate];
+    resetCommunityFeedback(candidate);
     resetPreview();
     byId('observation-heading').querySelector('span').textContent = ' / SPHEREx DR1';
     byId('observation-frame-note').hidden = false;
@@ -299,8 +359,27 @@ export function setupObservations(viewer, A, closeInspector) {
     }
   }
 
+  select.showCommunityFeedback = report => {
+    feedbackSection.hidden = false;
+    feedbackForm.hidden = true;
+    byId('community-feedback-share').hidden = true;
+    byId('community-feedback-shared').hidden = false;
+    const labels = { anomaly: 'The reviewer thinks this candidate could be an anomaly.', not_anomaly: 'The reviewer thinks this candidate is probably not an anomaly.', unsure: 'The reviewer is unsure whether this is an anomaly.' };
+    byId('community-feedback-shared-vote').textContent = labels[report.vote] ?? 'Assessment unavailable.';
+    byId('community-feedback-shared-note').textContent = report.note || 'The reviewer did not add notes.';
+    byId('community-feedback-shared-date').textContent = `Community review · ${new Date(report.created_at).toLocaleDateString()}`;
+  };
+
+  select.loadCommunityFeedback = async id => {
+    const response = await fetch('/community-feedback/' + encodeURIComponent(id));
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.error || 'Could not load this shared review.');
+    return report;
+  };
+
   select.radio = reference => {
     setSelecting(false);
+    resetCommunityFeedback(undefined);
     request?.abort();
     resetPreview();
     stop();

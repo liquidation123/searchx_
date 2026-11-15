@@ -8,6 +8,8 @@ import { servePreview } from './spherex-preview.mjs';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
 
 import { serveObservations } from './spherex-observations.mjs';
 import { serveBarnard } from './barnard/proxy.mjs';
@@ -37,9 +39,57 @@ for (const font of ['audiowide.ttf', 'michroma.ttf', 'space-grotesk-400.ttf']) {
 const properties = await readFile(new URL("./spherex-map/public/irsa.properties", import.meta.url), "utf8");
 const irsa = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube";
 const port = Number(process.env.PORT ?? 5173);
+const feedbackPool = process.env.DATABASE_URL ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 }) : null;
+async function readJson(request, maxBytes = 6000) {
+  let body = '';
+  for await (const chunk of request) {
+    body += chunk;
+    if (Buffer.byteLength(body) > maxBytes) throw Object.assign(new Error('Request is too large.'), { status: 413 });
+  }
+  try { return JSON.parse(body); }
+  catch { throw Object.assign(new Error('Send a valid JSON body.'), { status: 400 }); }
+}
+function sendJson(response, status, data) {
+  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  response.end(JSON.stringify(data));
+}
 export default async function handler(request, response) {
   const url = new URL(request.url, "http://localhost");
   const { pathname } = url;
+  const feedbackMatch = pathname.match(/^\/community-feedback(?:\/([0-9a-f-]{36}))?$/i);
+  if (feedbackMatch) {
+    if (!feedbackPool) { sendJson(response, 503, { error: 'Community feedback storage is not configured.' }); return; }
+    try {
+      if (request.method === 'POST' && !feedbackMatch[1]) {
+        const body = await readJson(request);
+        const vote = body.vote;
+        const note = typeof body.note === 'string' ? body.note.trim() : '';
+        const candidateId = typeof body.candidateId === 'string' ? body.candidateId : '';
+        const context = body.context;
+        if (!['anomaly', 'not_anomaly', 'unsure'].includes(vote)) { sendJson(response, 400, { error: 'Choose whether this seems like an anomaly.' }); return; }
+        if (note.length > 2000) { sendJson(response, 400, { error: 'Notes must be 2,000 characters or fewer.' }); return; }
+        if (!/^[a-zA-Z0-9._-]{1,100}$/.test(candidateId)) { sendJson(response, 400, { error: 'A valid candidate is required.' }); return; }
+        if (!context || !Number.isFinite(context.ra) || context.ra < 0 || context.ra >= 360 || !Number.isFinite(context.dec) || context.dec < -90 || context.dec > 90) { sendJson(response, 400, { error: 'A valid candidate position is required.' }); return; }
+        const id = randomUUID();
+        const safeContext = {
+          ra: context.ra, dec: context.dec,
+          candidateName: String(context.candidateName ?? '').slice(0, 160),
+          source: String(context.source ?? '').slice(0, 40),
+          frames: Array.isArray(context.frames) ? context.frames.slice(0, 20).map(frame => ({ id: String(frame.id ?? '').slice(0, 100), observedAt: String(frame.observedAt ?? '').slice(0, 40) })) : [],
+        };
+        await feedbackPool.query('INSERT INTO community_feedback (id, candidate_id, vote, note, context) VALUES ($1, $2, $3, $4, $5)', [id, candidateId, vote, note, JSON.stringify(safeContext)]);
+        sendJson(response, 201, { id }); return;
+      }
+      if (request.method === 'GET' && feedbackMatch[1]) {
+        const { rows } = await feedbackPool.query('SELECT id, candidate_id, vote, note, context, created_at FROM community_feedback WHERE id = $1', [feedbackMatch[1]]);
+        if (!rows[0]) { sendJson(response, 404, { error: 'Shared review not found.' }); return; }
+        sendJson(response, 200, rows[0]); return;
+      }
+      sendJson(response, 405, { error: 'Method not allowed.' }); return;
+    } catch (error) {
+      sendJson(response, error.status ?? 500, { error: error.status ? error.message : 'Could not save this review.' }); return;
+    }
+  }
   if (pathname === '/name-resolve' && request.method === 'GET') { await serveNameResolve(url, response); return; }
   if (pathname === '/analytics-config' && request.method === 'GET') { serveAnalyticsConfig(request, response); return; }
   if (pathname === '/gaia-source' && request.method === 'GET') { await serveGaiaSource(url, response); return; }
@@ -69,7 +119,7 @@ export default async function handler(request, response) {
     await serveFrame(pathname, response);
     return;
   }
-  const asset = assets.get(pathname);
+  const asset = assets.get(pathname) ?? (request.method === 'GET' && /^\/community-reviews\/[0-9a-f-]{36}$/i.test(pathname) ? assets.get('/observatory') : undefined);
   if (!asset || !['GET', 'HEAD'].includes(request.method)) {
     response.writeHead(404).end();
     return;

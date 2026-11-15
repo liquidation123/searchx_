@@ -19,9 +19,32 @@
       <div class="search-shell"><div class="search-input"><span aria-hidden="true" class="search-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4.5 4.5"></path></svg></span><input id="target" role="combobox" aria-label="Search the sky" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" autocomplete="off" placeholder="Search objects or coordinates"><button id="clear-search" type="button" aria-label="Clear search" hidden>×</button><button id="go" type="submit" aria-label="Search" title="Search">→</button></div><div id="search-popup" hidden><div id="suggestion-heading">DISCOVER THE SKY</div><div id="suggestions" role="listbox" aria-label="Search suggestions"></div><p id="search-hint" role="status" aria-live="polite"></p></div></div>
     </form>
     <button type="button" id="panel-open" aria-expanded="false" aria-controls="story-sidebar">Explore</button>
+    <button type="button" id="compare-open" aria-expanded="false" aria-controls="comparison-panel">Compare</button>
     <div class="map-controls" role="group" aria-label="Map navigation"><button type="button" id="share-view" disabled>Share view</button><button type="button" id="home" disabled title="Recenter">⌖ <span>Recenter</span></button><button type="button" id="map-zoom-in" aria-label="Zoom in">+</button><button type="button" id="map-zoom-out" aria-label="Zoom out">−</button></div>
     <p id="share-status" role="status" aria-live="polite" hidden></p><p id="navigation-status" role="status" hidden></p><p id="catalog-status" role="status" hidden></p>
   </div>
+  <div id="compare-instruction" hidden><span role="status">Select an object from search or the map for Object <strong id="compare-destination"></strong>.</span> <button id="compare-cancel" type="button">Cancel</button></div>
+  <section id="comparison-panel" aria-labelledby="compare-title" hidden>
+    <header><h2 id="compare-title" tabindex="-1">Compare objects</h2><button type="button" id="compare-close" aria-label="Close comparison">×</button></header>
+    <div class="compare-grid">
+      <section aria-label="Object A">
+        <strong>Object A</strong>
+        <div class="compare-actions"><button id="compare-pick-A" type="button">Choose A</button><button id="compare-use-A" type="button">Use inspected object</button></div>
+        <div id="compare-object-A"></div>
+      </section>
+      <section aria-label="Object B">
+        <strong>Object B</strong>
+        <div class="compare-actions"><button id="compare-pick-B" type="button">Choose B</button><button id="compare-use-B" type="button">Use inspected object</button></div>
+        <div id="compare-object-B"></div>
+      </section>
+    </div>
+    <div id="compare-difference" hidden>
+      <p><strong>Classification</strong> <span id="compare-types"></span></p>
+      <p><strong>Angular separation</strong> <span id="compare-separation"></span> <span>(on the sky)</span></p>
+      <p>These records do not provide matched physical measurements.</p>
+    </div>
+    <button id="compare-swap" type="button">Swap objects</button>
+  </section>
   <div id="notice" role="status">Starting the sky map…</div>
   <aside id="story-sidebar" aria-label="Explore panel"><header id="panel-header"><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><div id="panel-body">
   <section id="panel-tools" class="panel-tools" aria-label="Sky controls"><label class="tool-label" for="survey">IMAGE</label>
@@ -45,6 +68,8 @@
     <div class="inspector-content">
       <p class="eyebrow" id="object-type"></p><h2 id="object-name"></h2><p class="object-id" id="object-id"></p>
       <div class="object-summary"><p id="object-description" class="intro"></p><button id="favourite-toggle" type="button" aria-label="Add to favourites" aria-pressed="false" title="Add to favourites">☆</button></div><p id="favourite-feedback" role="status" aria-live="polite"></p>
+      <div class="compare-actions"><button type="button" id="inspector-compare-A">Use as Object A</button><button type="button" id="inspector-compare-B">Use as Object B</button></div>
+      <p id="quiz-unavailable" class="object-id" hidden>A reviewed quiz is unavailable for this object. Explore its observations or follow the catalog reference.</p>
     </div>
 
   </section>

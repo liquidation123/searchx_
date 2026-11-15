@@ -381,3 +381,40 @@ main[data-stage=understand] #story-action{display:none!important;}
 #favourites-list button { text-align:left; }
 #favourite-feedback { font-size:.75rem; }
 @media(min-width:851px) { #story-sidebar { top:96px; max-height:calc(100dvh - 108px); } }
+
+#compare-open {
+  position:absolute; top:16px; right:108px; min-height:44px; padding:0 14px;
+  pointer-events:auto; color:#253344; background:#f9fafc; border:1px solid #dae1e8;
+  border-radius:8px; box-shadow:0 3px 12px #0002; font-size:.76rem;
+}
+#comparison-panel, #compare-instruction {
+  position:absolute; z-index:15; color:#202c39; background:#fcfcfd;
+  border:1px solid #dce4ec; border-radius:12px; box-shadow:var(--shadow);
+}
+#comparison-panel {
+  right:20px; top:72px; width:min(720px, calc(100% - 40px)); max-height:calc(100dvh - 92px);
+  padding:16px; overflow:auto; overscroll-behavior:contain;
+}
+#comparison-panel header, .compare-actions {
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+#comparison-panel header { justify-content:space-between; margin-bottom:12px; }
+#comparison-panel h2, #comparison-panel h3 { margin:0 0 6px; }
+.compare-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.compare-grid section { padding:12px; background:#f1f5f9; border-radius:8px; overflow-wrap:anywhere; }
+.compare-grid h3 { margin-top:12px; font-size:1rem; }
+.compare-grid dl, #compare-difference { font-size:.84rem; line-height:1.45; }
+.compare-grid dt { margin-top:8px; font-weight:650; }
+.compare-grid dd { margin:0; }
+.compare-grid a, #quiz-feedback a { color:#1762a9; }
+#comparison-panel button, #compare-instruction button, .compare-actions button {
+  color:#253344; background:white; border:1px solid #cdd8e3; border-radius:7px;
+  min-height:34px; padding:5px 9px; font-size:.76rem;
+}
+#compare-instruction { right:20px; bottom:108px; max-width:calc(100% - 40px); padding:8px; font-size:.8rem; }
+@media(max-width:850px) {
+  #compare-open { top:10px; right:92px; padding:0 8px; }
+  #navigation { width:min(400px, calc(100vw - 175px)); }
+  #comparison-panel { top:62px; right:10px; width:calc(100% - 20px); max-height:calc(100dvh - 82px); }
+  #compare-instruction { bottom:112px; z-index:20; }
+}

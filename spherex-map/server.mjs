@@ -23,6 +23,8 @@ const assets = new Map([
   ['/', ['index.html', 'text/html']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/ui-state.js', ['ui-state.js', 'text/javascript']],
+  ['/comparison.js', ['comparison.js', 'text/javascript']],
+  ['/quiz-data.js', ['quiz-data.js', 'text/javascript']],
   ['/search.js', ['search.js', 'text/javascript']],
   ['/sky-data.js', ['sky-data.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],

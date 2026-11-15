@@ -491,11 +491,11 @@ byId('quiz-next').addEventListener('click', () => {
   byId('explore-another').hidden = false;
   byId('quiz-heading').focus();
 });
-function setStage(stage) {
+function setStage(stage, objectId = selectedReference?.id) {
   if(stage==='understand' && !reviewedQuestions[selectedReference?.id]) return;
   if (document.querySelector('main').dataset.stage !== stage) {
     featureUsed('panel stage', stage);
-    if (stage === 'observe') track('Observation Viewed', { object_id: selectedReference?.id });
+    if (stage === 'observe') track('Observation Viewed', { object_id: objectId });
   }
   const main=document.querySelector('main'); main.dataset.stage=stage;
   if (stage === 'understand' && !byId('quiz-complete').hidden) resetQuiz();
@@ -567,11 +567,13 @@ async function start() {
     byId('observation-center').after(reviewCandidates);
     function openSieveDemo(source = 'review candidates') {
       featureUsed('SIEVE demo', source);
+      track('Object Explored', { object_id: sieveDemo.id, object_type: 'candidate', catalog: 'SIEVE demo' });
       searchRevision++;
       byId('lesson').hidden = true;
       inspect(null);
       pointAt(sieveDemo.ra, sieveDemo.dec, .2);
       void selectObservations(sieveDemo.ra, sieveDemo.dec, false, sieveDemo);
+      setStage('observe', sieveDemo.id);
     }
     reviewCandidates.addEventListener('click', () => openSieveDemo());
 

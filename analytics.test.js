@@ -31,7 +31,9 @@ test('campaign attribution follows a visitor from homepage to Observatory within
 
 test('analytics configuration is disabled without a valid project token', () => {
   const previous = process.env.MIXPANEL_TOKEN;
+  const previousRegion = process.env.MIXPANEL_REGION;
   delete process.env.MIXPANEL_TOKEN;
+  process.env.MIXPANEL_REGION = 'EU';
   let body;
   const response = { writeHead(status, headers) {
     assert.equal(status, 200);
@@ -40,9 +42,11 @@ test('analytics configuration is disabled without a valid project token', () => 
   }, end(value) { body = JSON.parse(value); } };
   try {
     serveAnalyticsConfig({ headers: { 'x-vercel-ip-country': 'CA' } }, response);
-    assert.deepEqual(body, { token: null, country: 'CA' });
+    assert.deepEqual(body, { token: null, region: 'EU', country: 'CA' });
   } finally {
     if (previous === undefined) delete process.env.MIXPANEL_TOKEN;
     else process.env.MIXPANEL_TOKEN = previous;
+    if (previousRegion === undefined) delete process.env.MIXPANEL_REGION;
+    else process.env.MIXPANEL_REGION = previousRegion;
   }
 });

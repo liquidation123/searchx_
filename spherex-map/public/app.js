@@ -4,6 +4,7 @@ import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
 import { sieveDemo } from './sieve-demo.js';
 import { setupCatalogDiscovery } from './catalog-discovery.js';
+import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSelected, objectExplored, featureUsed, track } from '/analytics.js';
 
 import { barnardMarker, setupBarnard } from './barnard-timelapse.js';
 
@@ -65,6 +66,7 @@ function inspect(reference) {
     pin.setAttribute('aria-expanded', String(pin.dataset.reference === reference?.id));
   }
   if (!reference) return;
+  objectExplored(reference);
   byId('object-fields').closest('details').open = false;
   byId('copy-status').textContent = '';
   const exhibit = exhibits[reference.id];
@@ -102,13 +104,14 @@ function pointAt(ra, dec, fov) {
   requestAnimationFrame(updatePosition);
 }
 
-function goToReference(reference) {
+function goToReference(reference, source = 'shortcut') {
   searchRevision++;
   showNavigationStatus('');
   byId('guide').open = false;
   target.value = reference.id;
   pointAt(reference.ra, reference.dec, reference.fov);
   rememberTarget(reference.ra, reference.dec, reference.id, reference.fov);
+  resultSelected(reference, source);
   inspect(reference);
 }
 
@@ -173,6 +176,7 @@ function opticalLayer() {
 }
 survey.addEventListener('change', () => {
   if (!viewer) return;
+  featureUsed('sky survey', survey.value);
   const infrared = survey.value === 'infrared';
   const source = byId('image-source');
   channel.hidden = !infrared; channel.disabled = !infrared;
@@ -183,7 +187,7 @@ survey.addEventListener('change', () => {
   const center = viewer.getRaDec(), fov = viewer.getFoV()[0];
   viewer.setBaseImageLayer(opticalLayer()); pointAt(...center, fov);
 });
-channel.addEventListener('change', applyChannel);
+channel.addEventListener('change', () => { featureUsed('wavelength', String(channel.value)); applyChannel(); });
 byId('copy-position').addEventListener('click', async () => {
   const status=byId('copy-status');
   try { await navigator.clipboard.writeText(`${selectedReference.ra}, ${selectedReference.dec}`); status.textContent=' Copied.'; }
@@ -197,6 +201,7 @@ for (const [id, factor] of [['map-zoom-in', .75], ['map-zoom-out', 1.333]]) byId
 const popup = byId('search-popup');
 const list = byId('suggestions');
 let matches = [], active = -1;
+let submittedForInput = false;
 function dismiss() { popup.hidden = true; target.setAttribute('aria-expanded','false'); target.removeAttribute('aria-activedescendant'); active = -1; syncState(); }
 function render() {
   const result = search(target.value); matches = result.results.slice(0, 6); active = -1;
@@ -220,7 +225,14 @@ function render() {
 }
 function setActive(index) { active=(index+matches.length)%matches.length; [...list.children].forEach((el,i)=>el.setAttribute('aria-selected',String(i===active))); target.setAttribute('aria-activedescendant','suggestion-'+active); list.children[active]?.scrollIntoView({block:'nearest'}); }
 function choose(entry) {
+  if (!submittedForInput && target.value.trim()) {
+    searchSubmitted(target.value, 'suggestion');
+    const count = matches.filter(match => match.type !== 'catalog').length;
+    if (count) resultsShown(count, 'local catalog');
+    submittedForInput = true;
+  }
   if (entry.type === 'catalog') { resolveExternal(entry.query); return; }
+  if (entry.type !== 'object') resultSelected(entry, 'search');
   const refresh = !byId('observation-panel').hidden;
   if (refresh) selectObservations.close();
   if (!byId('barnard-panel').hidden) byId('barnard-close').click();
@@ -230,7 +242,7 @@ function choose(entry) {
   byId('lesson').hidden=true; syncState();
   if(!viewer) {showNavigationStatus('The sky map is still starting. Select this result again when it is ready.');return;}
   if(entry.type==='object') {
-    goToReference(entry);
+    goToReference(entry, 'search');
     target.value=entry.name;
     return;
   }
@@ -243,11 +255,11 @@ async function resolveGaia(id) {
     const response=await fetch('/gaia-source?id='+encodeURIComponent(id),{signal:AbortSignal.timeout(10000)});
     const result=await response.json();
     if(revision!==searchRevision)return;
-    if(result.status==='not_found'){showNavigationStatus('Gaia DR3 source not found. Check the identifier.');return;}
+    if(result.status==='not_found'){noResults('not_found');showNavigationStatus('Gaia DR3 source not found. Check the identifier.');return;}
     if(!response.ok||result.status!=='found')throw new Error('Gaia unavailable');
     const reference=result.source;
     pointAt(reference.ra,reference.dec,.25);rememberTarget(reference.ra,reference.dec,reference.id,.25);
-    showResolvedMarker(reference);inspect(reference);showNavigationStatus('Source from ESA Gaia DR3.');
+    resultsShown(1, 'Gaia DR3'); resultSelected(reference); showResolvedMarker(reference);inspect(reference);showNavigationStatus('Source from ESA Gaia DR3.');
   }catch{if(revision===searchRevision)showNavigationStatus('Gaia archive is unavailable. Try again later.');}
 }
 async function resolveChime(id) {
@@ -257,12 +269,12 @@ async function resolveChime(id) {
     const response = await fetch('/chime-event?id=' + encodeURIComponent(id), { signal: AbortSignal.timeout(10000) });
     const result = await response.json();
     if (revision !== searchRevision) return;
-    if (result.status === 'not_found') { showNavigationStatus('Event not found in CHIME/FRB Catalog 2.'); return; }
+    if (result.status === 'not_found') { noResults('not_found'); showNavigationStatus('Event not found in CHIME/FRB Catalog 2.'); return; }
     if (!response.ok || result.status !== 'found') throw new Error('CHIME unavailable');
     const reference = result.source;
     pointAt(reference.ra, reference.dec, Math.max(.2, 4 * Math.max(reference.radio.raError || 0, reference.radio.decError || 0)));
     rememberTarget(reference.ra, reference.dec, reference.id);
-    showResolvedMarker(reference); inspect(reference);
+    resultsShown(1, 'CHIME/FRB Catalog 2'); resultSelected(reference); showResolvedMarker(reference); inspect(reference);
     showNavigationStatus('Published CHIME/FRB Catalog 2 event.');
   } catch { if (revision === searchRevision) showNavigationStatus('CHIME/FRB Catalog 2 is unavailable. Try again later.'); }
 }
@@ -300,6 +312,7 @@ function resolveExternal(query, useAi = true) {
         const result = await response.json();
         if (revision !== searchRevision) return;
         if (!result.target) {
+          noResults('not_found');
           showNavigationStatus(result.message || 'Try adding an object name or a constellation.');
           return;
         }
@@ -313,6 +326,7 @@ function resolveExternal(query, useAi = true) {
     if (revision !== searchRevision) return;
     const { ra, dec } = position ?? {};
     if (!Number.isFinite(ra) || !Number.isFinite(dec) || ra < 0 || ra >= 360 || Math.abs(dec) > 90) {
+      noResults('not_found');
       showNavigationStatus('No catalog position found for ' + name + '. Try a more specific query.');
       return;
     }
@@ -324,7 +338,7 @@ function resolveExternal(query, useAi = true) {
       category: position.category || 'CATALOG SOURCE',
       description: position.category ? 'Catalog classification: '+position.category+'.' : 'Catalog name resolved to this sky position; classification is unavailable.',
       url: 'https://simbad.cfa.harvard.edu/simbad/sim-id?Ident=' + encodeURIComponent(position.id || name) };
-    showResolvedMarker(resolved);
+    resultsShown(1, 'CDS Sesame'); resultSelected(resolved); showResolvedMarker(resolved);
     inspect(resolved);
     byId('lesson').hidden = true;
     syncState();
@@ -334,17 +348,19 @@ function resolveExternal(query, useAi = true) {
 }
 target.addEventListener('focus',render);
 target.addEventListener('click',()=>{if(popup.hidden)render();});
-target.addEventListener('input',()=>{++searchRevision;showNavigationStatus('');render();});
+target.addEventListener('input',()=>{++searchRevision;submittedForInput=false;if(target.value.trim())searchStartedEvent();showNavigationStatus('');render();});
 target.addEventListener('keydown',event=>{
   if(event.key==='Escape' && !popup.hidden){event.stopPropagation();dismiss();return;}
   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(popup.hidden)render();if(matches.length)setActive(active < 0 ? (event.key==='ArrowDown' ? 0 : matches.length-1) : active+(event.key==='ArrowDown'?1:-1));}
 });
 byId('navigation').addEventListener('submit',event=>{
   event.preventDefault(); const query=target.value.trim(); if(!query){render();return;}
+  searchSubmitted(query); submittedForInput = true;
   const chime=query.match(/^(FRB\d{8}[A-Z])$/i); if(chime){void resolveChime(chime[1].toUpperCase());return;}
   const gaia=query.match(/^Gaia\s+(?:DR3\s+)?(\d{1,19})$/i); if(gaia){void resolveGaia(gaia[1]);return;}
   if(/^(?:Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Europa|Ceres|Halley(?:'s)? comet)$/i.test(query)){showNavigationStatus('Moving objects need a date-specific ephemeris; this sky map does not locate them yet.');dismiss();return;}
   const result=search(query); if(result.error){showNavigationStatus(result.error);render();return;}
+  if (result.results.length) resultsShown(result.results.length, 'local catalog');
   if(active>=0 && !popup.hidden){choose(matches[active]);return;}
   if(result.exact){choose(result.exact);return;}
   if(result.ambiguous){render();showNavigationStatus('Choose a result from the suggestions.');return;}
@@ -445,6 +461,7 @@ function showQuestion() {
     button.addEventListener('click', () => {
       for (const answer of answers.children) answer.disabled = true;
       const correct = index === question.correct;
+      track('Learning Question Answered', { question_number: quizIndex + 1, correct, object_id: selectedReference?.id });
       button.classList.add(correct ? 'correct' : 'incorrect');
       answers.children[question.correct].classList.add('correct');
       byId('quiz-feedback').textContent = (correct ? 'Correct. ' : 'Not quite. ') + question.feedback;
@@ -474,8 +491,12 @@ byId('quiz-next').addEventListener('click', () => {
   byId('explore-another').hidden = false;
   byId('quiz-heading').focus();
 });
-function setStage(stage) {
+function setStage(stage, objectId = selectedReference?.id) {
   if(stage==='understand' && !reviewedQuestions[selectedReference?.id]) return;
+  if (document.querySelector('main').dataset.stage !== stage) {
+    featureUsed('panel stage', stage);
+    if (stage === 'observe') track('Observation Viewed', { object_id: objectId });
+  }
   const main=document.querySelector('main'); main.dataset.stage=stage;
   if (stage === 'understand' && !byId('quiz-complete').hidden) resetQuiz();
   byId('quiz').hidden = stage !== 'understand';
@@ -544,14 +565,17 @@ async function start() {
     reviewCandidates.type = 'button';
     reviewCandidates.textContent = 'Review candidates';
     byId('observation-center').after(reviewCandidates);
-    function openSieveDemo() {
+    function openSieveDemo(source = 'review candidates') {
+      featureUsed('SIEVE demo', source);
+      track('Object Explored', { object_id: sieveDemo.id, object_type: 'candidate', catalog: 'SIEVE demo' });
       searchRevision++;
       byId('lesson').hidden = true;
       inspect(null);
       pointAt(sieveDemo.ra, sieveDemo.dec, .2);
       void selectObservations(sieveDemo.ra, sieveDemo.dec, false, sieveDemo);
+      setStage('observe', sieveDemo.id);
     }
-    reviewCandidates.addEventListener('click', openSieveDemo);
+    reviewCandidates.addEventListener('click', () => openSieveDemo());
 
     const pins = [...references, barnardMarker, sieveDemo].map(reference => {
       const pin = document.createElement('button');
@@ -564,10 +588,11 @@ async function start() {
       label.textContent = reference.name;
       pin.append(label);
       pin.addEventListener('click', () => {
-        if (reference === sieveDemo) return openSieveDemo();
+        if (reference === sieveDemo) return openSieveDemo('map pin');
         searchRevision++;
         showNavigationStatus('');
         if (reference === barnardMarker) {
+          featureUsed('Barnard time lapse', 'map pin');
           byId('lesson').hidden = true;
           if (!byId('observation-panel').hidden) byId('observation-close').click();
           inspect(null);
@@ -576,7 +601,7 @@ async function start() {
           return;
         }
         rememberTarget(reference.ra, reference.dec, reference === home ? 'Horsehead' : reference.id);
-        dismiss(); if (selectedReference?.id === reference.id) { selectObservations.close(); inspect(null); } else inspect(reference);
+        dismiss(); if (selectedReference?.id === reference.id) { selectObservations.close(); inspect(null); } else { resultSelected(reference, 'map'); inspect(reference); }
       });
       byId('map-pins').append(pin);
       return { pin, reference };
@@ -601,12 +626,12 @@ async function start() {
       const pin = document.createElement('button'); pin.type='button'; pin.className='map-pin';
       pin.dataset.reference=reference.id; pin.dataset.resolved='true';
       pin.setAttribute('aria-label', reference.name); pin.setAttribute('aria-controls','inspector');
-      pin.addEventListener('click', () => inspect(reference));
+      pin.addEventListener('click', () => { resultSelected(reference, 'map'); inspect(reference); });
       const label=document.createElement('span');label.textContent=reference.name;pin.append(label);
       byId('map-pins').append(pin); pins.push({pin,reference});
     };
     setupCatalogDiscovery(viewer, A, reference => {
-      showResolvedMarker(reference); inspect(reference);
+      resultSelected(reference, 'map'); showResolvedMarker(reference); inspect(reference);
     }, message => { byId('catalog-status').textContent=message; byId('catalog-status').hidden=!message; });
     for (const reference of references) {
       const button = document.createElement('button');

@@ -20,6 +20,8 @@ let searchId;
 let searchSelected = false;
 let searchStarted = false;
 let page = typeof location !== 'undefined' && location.pathname === '/observatory' ? 'observatory' : 'home';
+const siteEnvironment = typeof location !== 'undefined' && ['searchx.earth', 'www.searchx.earth'].includes(location.hostname)
+  ? 'production' : 'development';
 const pending = [];
 
 export function safeQuery(query, canonical = '') {
@@ -90,7 +92,7 @@ function visitorStatus(now) {
 
 export function track(event, properties = {}) {
   if (!events.has(event)) return;
-  const payload = { page, session_id: session?.id, country, ...attribution, ...properties };
+  const payload = { page, site_environment: siteEnvironment, session_id: session?.id, country, ...attribution, ...properties };
   Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
   if (ready) { try { sdk.track(event, payload); } catch { /* Analytics cannot interrupt exploration. */ } }
   else if (pending.length < 30) pending.push([event, payload]);

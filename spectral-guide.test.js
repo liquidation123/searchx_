@@ -27,7 +27,9 @@ test('the Observatory guide labels its Cygnus visual as published evidence, not 
   assert.match(html, /id="spectral-published-result" hidden/);
   assert.match(html, /See the Cygnus X water map/);
   assert.match(html, /id="spectral-result-status"/);
-  assert.match(html, /Published SPHEREx view of Cygnus X/);
+  assert.match(html, /Annotated NASA SPHEREx map of Cygnus X/);
+  assert.match(html, /water ice \(H₂O\)/);
+  assert.match(html, /water ice across the map/);
   assert.match(app, /dataset\.feature = feature\.id/);
   assert.match(app, /data-feature.*water-ice/);
   assert.match(app, /Published SPHEREx map: \$\{feature.label\} is mapped in Cygnus X/);

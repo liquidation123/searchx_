@@ -337,6 +337,27 @@ main.panel-collapsed #panel-stages,main.panel-collapsed #panel-body,main.panel-c
 }
 #catalog-status{position:absolute;right:20px;bottom:102px;margin:0;padding:5px 8px;border-radius:6px;background:#f8fafce8;color:#52657a;font-size:.65rem;pointer-events:none}
 #panel-stages button[hidden]{display:none}
+.community-feedback{margin:18px 28px 28px;padding:16px;border:1px solid #d8e2ec;border-radius:12px;background:#f4f8fc;color:#263647;font-size:.82rem;line-height:1.5}
+.community-feedback .eyebrow{margin:0 0 6px;color:#1762a9;font-size:.62rem;font-weight:750;letter-spacing:.12em}
+.community-feedback h3{margin:0 0 6px;color:#172332;font-size:1rem;line-height:1.35}
+.community-feedback-help{margin:0 0 14px!important;color:#596d82;font-size:.76rem}
+.community-votes{display:grid;gap:6px;margin:0 0 14px;padding:0;border:0}
+.community-votes legend{margin-bottom:6px;color:#40546a;font-size:.73rem;font-weight:650}
+.community-votes label{display:flex;align-items:center;gap:8px;min-height:38px;padding:6px 9px;border:1px solid #d5dfe9;border-radius:8px;background:#fff;cursor:pointer}
+.community-votes label:has(input:checked){border-color:#2879bf;background:#eaf3fb}
+.community-votes input{accent-color:#176cc1}
+.community-note-label{display:flex;justify-content:space-between;margin:0 0 5px;color:#34485d;font-size:.75rem;font-weight:650}
+.community-link-label{display:block;margin:12px 0 5px;color:#34485d;font-size:.73rem;font-weight:650}
+#community-feedback-url{display:block;width:100%;padding:8px;border:1px solid #cfd9e3;border-radius:7px;background:#fff;color:#34516b;font-size:.72rem}
+#community-note{display:block;width:100%;min-height:78px;padding:9px;border:1px solid #cfd9e3;border-radius:8px;background:#fff;color:#1c2a39;font:inherit;font-size:.78rem;resize:vertical}
+#community-feedback-submit,#community-feedback-share-button{width:100%;min-height:40px;margin-top:9px;padding:8px 12px;border:0;border-radius:8px;background:#176cc1;color:#fff;font:inherit;font-weight:650;cursor:pointer}
+#community-feedback-submit:hover,#community-feedback-share-button:hover{background:#0d579f}
+#community-feedback-submit:disabled{opacity:.6;cursor:default}
+#community-feedback-status,#community-feedback-share-status{min-height:1.2em;margin:8px 0 0;color:#4d6277;font-size:.75rem}
+#community-feedback-share-status{display:block}
+#community-feedback-shared-vote{margin:0 0 8px;font-weight:700;color:#263647}
+#community-feedback-shared-note{margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;color:#263647}
+@media(max-width:850px){.community-feedback{margin:16px 20px 24px}}
 
 /* Keep the sky underneath the compact panel rather than exposing an empty strip. */
 @media(min-width:851px){main.story-open #sky,main.story-open #map-pins{left:0;width:100%}}

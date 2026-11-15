@@ -653,6 +653,18 @@ async function start() {
       setStage('observe', sieveDemo.id);
     }
     reviewCandidates.addEventListener('click', () => openSieveDemo());
+    reviewCandidates.addEventListener('click', () => openSieveDemo());
+    const sharedReview = location.pathname.match(/^\/community-reviews\/([0-9a-f-]{36})$/i);
+    if (sharedReview) {
+      void (async () => {
+        try {
+          const report = await selectObservations.loadCommunityFeedback(sharedReview[1]);
+          if (report.candidate_id !== sieveDemo.id) throw new Error('This review belongs to a candidate that is not available in this build.');
+          openSieveDemo();
+          selectObservations.showCommunityFeedback(report);
+        } catch (error) { showNavigationStatus(error.message); }
+      })();
+    }
 
     const pins = [...references, barnardMarker, sieveDemo].map(reference => {
       const pin = document.createElement('button');

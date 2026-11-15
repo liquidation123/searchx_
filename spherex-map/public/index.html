@@ -79,6 +79,24 @@
       <a id="observation-source" target="_blank" rel="noopener noreferrer">Source SPHEREx FITS at NASA/IPAC IRSA ↗</a>
       <p>Previews show individual SPHEREx exposures. Brightness uses a shared scale across this sequence. Detector orientation and wavelength can vary across exposures. Use the FITS cutout for measurements.</p>
     </div>
+    <section id="community-feedback" class="community-feedback" hidden aria-labelledby="community-feedback-title">
+      <p class="eyebrow">COMMUNITY REVIEW</p>
+      <h3 id="community-feedback-title">Do you think this candidate is an anomaly?</h3>
+      <p class="community-feedback-help">Your response is a community opinion, not a scientific verdict. Add a note about what you noticed. Anyone with the review link can read both.</p>
+      <form id="community-feedback-form">
+        <fieldset class="community-votes"><legend>Your assessment</legend>
+          <label><input type="radio" name="community-vote" value="anomaly" required><span>Yes, it could be</span></label>
+          <label><input type="radio" name="community-vote" value="not_anomaly"><span>No, probably not</span></label>
+          <label><input type="radio" name="community-vote" value="unsure"><span>I’m not sure</span></label>
+        </fieldset>
+        <label class="community-note-label" for="community-note">Your notes <span>optional</span></label>
+        <textarea id="community-note" maxlength="2000" rows="3" placeholder="What stands out? What would you check next?"></textarea>
+        <button id="community-feedback-submit" type="submit">Save my response</button>
+        <p id="community-feedback-status" role="status" aria-live="polite"></p>
+      </form>
+      <div id="community-feedback-share" hidden><label class="community-link-label" for="community-feedback-url">Shareable review link</label><input id="community-feedback-url" type="url" readonly><button id="community-feedback-share-button" type="button">Share this candidate</button><span id="community-feedback-share-status" role="status" aria-live="polite"></span></div>
+      <div id="community-feedback-shared" hidden aria-live="polite"><p id="community-feedback-shared-vote"></p><p id="community-feedback-shared-note"></p><p id="community-feedback-shared-date" class="community-feedback-help"></p></div>
+    </section>
   </section>
 <section id="story-supplement" class="story-section" hidden>      <h3>Why it’s interesting</h3><p id="object-why"></p>
       <a id="object-learn" class="source-link" target="_blank" rel="noopener noreferrer">Explore further at NASA <span aria-hidden="true">↗</span></a>

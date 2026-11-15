@@ -1,4 +1,4 @@
-import { parseProperties, references, decodeView, encodeView, restoreView } from './sky-data.js';
+import { parseProperties, references, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
 import { catalogQuery, search } from './search.js';
 import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
@@ -74,6 +74,8 @@ function inspect(reference) {
   byId('story-supplement').hidden = !exhibit;
   if (exhibit) byId('object-learn').href = exhibit.url;
   byId('object-name').textContent = reference.name;
+  byId('favourite-feedback').textContent = '';
+  syncFavourite();
   byId('object-description').textContent = reference.description || 'Position resolved by CDS Sesame; classification not available.';
   byId('object-catalog').textContent = reference.source + ' · ' + reference.id;
   byId('object-position').textContent = positionText(reference.ra, reference.dec);
@@ -85,6 +87,53 @@ function inspect(reference) {
     else void selectObservations(reference.ra, reference.dec);
   }
 }
+
+const favouriteKey = 'searchx.favourites.v1';
+let favourites = [];
+try { favourites = parseFavourites(localStorage.getItem(favouriteKey)); } catch {}
+const favouriteId = item => item.source + '\0' + item.id;
+function syncFavourite() {
+  const button = byId('favourite-toggle');
+  const saved = !!selectedReference && favourites.some(item => favouriteId(item) === favouriteId(selectedReference));
+  button.textContent = saved ? '★' : '☆';
+  button.setAttribute('aria-pressed', String(saved));
+  button.setAttribute('aria-label', saved ? 'Remove from favourites' : 'Add to favourites');
+  button.title = button.getAttribute('aria-label');
+}
+function renderFavourites() {
+  const list = byId('favourites-list');
+  list.replaceChildren();
+  if (!favourites.length) list.textContent = 'No favourites yet.';
+  for (const item of favourites) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.textContent = item.name;
+    button.addEventListener('click', () => {
+      if (!viewer) { showNavigationStatus('The sky map is still starting.'); return; }
+      byId('favourites').open = false; byId('layers').open = false;
+      if (item.source === 'CHIME/FRB Catalog 2') { void resolveChime(item.id); return; }
+      const reference = references.find(entry => favouriteId(entry) === favouriteId(item)) ?? item;
+      goToReference({...reference, fov: reference.fov ?? .25});
+    });
+    list.append(button);
+  }
+  syncFavourite();
+}
+byId('favourite-toggle').addEventListener('click', () => {
+  const entry = normalizeFavourite(selectedReference);
+  if (!entry) return;
+  const id = favouriteId(entry);
+  const next = favourites.some(item => favouriteId(item) === id)
+    ? favourites.filter(item => favouriteId(item) !== id) : [...favourites, entry];
+  if (next.length > 500) { byId('favourite-feedback').textContent = 'Favourites are full; remove one to add another.'; return; }
+  try {
+    localStorage.setItem(favouriteKey, JSON.stringify(next));
+    favourites = next;
+    byId('favourite-feedback').textContent = next.some(item => favouriteId(item) === id) ? 'Added to favourites.' : 'Removed from favourites.';
+    renderFavourites();
+  } catch { byId('favourite-feedback').textContent = 'Could not save favourites on this device.'; }
+});
+addEventListener('storage', event => { if (event.key === favouriteKey) { favourites = parseFavourites(event.newValue); renderFavourites(); } });
+renderFavourites();
 
 function rememberTarget(ra, dec, label, fov = viewer.getFoV()[0]) {
   lastTarget = { ra, dec, label, fov };
@@ -702,12 +751,27 @@ byId('sheet-toggle').addEventListener('click', event => {
 
 const panel=byId('story-sidebar'), main=document.querySelector('main');
 let panelWidth=340, floating=false, collapsed=false;
-function positionPanel(x,y) { const maxX=Math.max(0,innerWidth-panelWidth), maxY=Math.max(0,innerHeight-90); panel.style.left=Math.max(0,Math.min(x,maxX))+'px'; panel.style.top=Math.max(0,Math.min(y,maxY))+'px'; }
+function positionPanel(x,y) {
+  const width = panel.offsetWidth, height = panel.offsetHeight;
+  const maxX = Math.max(0, innerWidth - width), maxY = Math.max(0, innerHeight - height);
+  x = Math.max(0, Math.min(x, maxX));
+  // Keep the search/layers row and, where space permits, the map controls clear.
+  const minY = Math.min(76, maxY);
+  const controls = document.querySelector('.map-controls').getBoundingClientRect();
+  if (x + width > controls.left && x < controls.right) {
+    const safeY = controls.top - height - 8;
+    if (safeY >= minY) y = Math.min(y, safeY);
+    else x = Math.max(0, Math.min(x, controls.left - width - 8));
+  }
+  panel.style.left = x + 'px';
+  panel.style.top = Math.max(minY, Math.min(y, maxY)) + 'px';
+}
 function applyWidth(value) { panelWidth=Math.max(300,Math.min(440,value));main.style.setProperty('--panel-width',panelWidth+'px');byId('panel-resize').setAttribute('aria-valuenow',String(panelWidth));if(floating)positionPanel(panel.offsetLeft,panel.offsetTop); }
 function dock() { floating=false;main.classList.remove('panel-floating');panel.style.left='';panel.style.top=''; }
 byId('panel-header').addEventListener('pointerdown',event=>{if(event.target.closest('button')||matchMedia('(max-width:850px)').matches)return;const startX=event.clientX,startY=event.clientY,rect=panel.getBoundingClientRect();let moved=false;const move=e=>{if(!moved&&Math.hypot(e.clientX-startX,e.clientY-startY)<6)return;moved=true;floating=true;main.classList.add('panel-floating');positionPanel(rect.left+e.clientX-startX,rect.top+e.clientY-startY);};const up=e=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);if(moved&&e.clientX<45)dock();};addEventListener('pointermove',move);addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('pointerdown',event=>{if(matchMedia('(max-width:850px)').matches)return;event.preventDefault();event.target.setPointerCapture(event.pointerId);const width=panelWidth,x=event.clientX;const move=e=>applyWidth(width+e.clientX-x);const up=()=>{event.target.removeEventListener('pointermove',move);event.target.removeEventListener('pointerup',up);};event.target.addEventListener('pointermove',move);event.target.addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();applyWidth(panelWidth+(event.key==='ArrowRight'?10:-10));}else if(event.key==='Home'||event.key==='End'){event.preventDefault();applyWidth(event.key==='Home'?300:440);}});
 byId('panel-collapse').addEventListener('click',()=>{collapsed=!collapsed;main.classList.toggle('panel-collapsed',collapsed);byId('panel-collapse').textContent=collapsed?'+':'−';byId('panel-collapse').setAttribute('aria-label',collapsed?'Restore panel':'Collapse panel');});
-addEventListener('resize',()=>{if(floating)positionPanel(panel.offsetLeft,panel.offsetTop);});
+addEventListener('resize',()=>{if(floating && matchMedia('(max-width:850px)').matches) dock(); else if(floating) positionPanel(panel.offsetLeft,panel.offsetTop);});
+new ResizeObserver(() => { if (floating && !matchMedia('(max-width:850px)').matches) positionPanel(panel.offsetLeft,panel.offsetTop); }).observe(panel);
 applyWidth(340);

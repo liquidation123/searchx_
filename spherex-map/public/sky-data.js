@@ -84,3 +84,31 @@ export function restoreView(state, {pointAt, setSurvey}) {
   setSurvey(state.survey, state.channel);
   pointAt(state.ra, state.dec, state.fov);
 }
+
+export function normalizeFavourite(item) {
+  if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id.trim() ||
+      typeof item.name !== 'string' || !item.name.trim() || typeof item.source !== 'string' || !item.source.trim() ||
+      !Number.isFinite(item.ra) || item.ra < 0 || item.ra >= 360 ||
+      !Number.isFinite(item.dec) || Math.abs(item.dec) > 90) return null;
+  const result = {id: item.id.slice(0, 256), name: item.name.slice(0, 256), source: item.source.slice(0, 128), ra: item.ra, dec: item.dec};
+  for (const key of ['description', 'category']) if (typeof item[key] === 'string') result[key] = item[key].slice(0, 1000);
+  if (Number.isFinite(item.fov) && item.fov > 0 && item.fov <= 180) result.fov = item.fov;
+  if (typeof item.url === 'string') {
+    try { const url = new URL(item.url); if (url.protocol === 'https:') result.url = url.href; } catch {}
+  }
+  // Radio details are restored from the catalog on selection, rather than saved as an incomplete object.
+  return result;
+}
+
+export function parseFavourites(raw) {
+  try {
+    const items = JSON.parse(raw || '[]');
+    if (!Array.isArray(items)) return [];
+    const result = new Map();
+    for (const item of items.slice(0, 500)) {
+      const entry = normalizeFavourite(item);
+      if (entry) result.set(entry.source + '\0' + entry.id, entry);
+    }
+    return [...result.values()];
+  } catch { return []; }
+}

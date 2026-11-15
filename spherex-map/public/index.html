@@ -21,6 +21,7 @@
       <select id="survey" aria-label="Sky survey" disabled><option value="optical">DSS2 · Optical color</option><option value="infrared">SPHEREx · Infrared</option></select>
       <select id="channel" aria-label="Infrared wavelength" disabled hidden></select>
 
+      <details id="favourites"><summary>★ Favourites</summary><div id="favourites-list"></div></details>
       <button type="button" id="barnard-select" aria-pressed="false" disabled>Select region</button>
       <button type="button" id="barnard-shortcut" disabled hidden>Barnard's Star</button>
       <button type="button" id="observation-center" disabled>Observations at map center</button>
@@ -45,7 +46,7 @@
 <button id="close-inspector" class="story-close" type="button" aria-label="Close object details" hidden>×</button>
     <div class="inspector-content">
       <p class="eyebrow" id="object-type"></p><h2 id="object-name"></h2><p class="object-id" id="object-id"></p>
-      <p id="object-description" class="intro"></p>
+      <div class="object-summary"><p id="object-description" class="intro"></p><button id="favourite-toggle" type="button" aria-label="Add to favourites" aria-pressed="false" title="Add to favourites">☆</button></div><p id="favourite-feedback" role="status" aria-live="polite"></p>
     </div>
 
   </section>

@@ -1,3 +1,5 @@
+import { setupComparisonReport } from './comparison-report.js';
+import { comparisonLink, parseComparisonLink, restoreComparisonObject, sieveComparisonRecord } from './comparison-link.js';
 import { setupComparison, comparisonObject, hasSkyPosition } from './comparison.js';
 import { questionsFor } from './quiz-data.js';
 import { parseProperties, references, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
@@ -103,7 +105,17 @@ function asComparisonObject(reference) {
 const comparison = setupComparison({
   focusSearch() { ++searchRevision; submittedForInput = false; target.value = ''; target.focus(); render(); },
   selectedObject: () => asComparisonObject(selectedReference),
+  onChange: () => comparisonReport.changed(),
 });
+const comparisonReport = setupComparisonReport({
+  getPair: () => comparison.objects,
+  getComparisonUrl: pair => comparisonLink(location.href, pair),
+});
+const sharedComparison = parseComparisonLink(location.search);
+if (sharedComparison) {
+  void Promise.all([restoreComparisonObject(sharedComparison.A), restoreComparisonObject(sharedComparison.B)])
+    .then(([A, B]) => comparison.restore({A, B}));
+}
 
 const favouriteKey = 'searchx.favourites.v1';
 let favourites = [];
@@ -681,7 +693,14 @@ async function start() {
       label.textContent = reference.name;
       pin.append(label);
       pin.addEventListener('click', () => {
-        if (reference === sieveDemo) return openSieveDemo('map pin');
+        if (reference === sieveDemo) {
+          if (comparison.pending) {
+            dismiss();
+            comparison.accept(asComparisonObject(sieveComparisonRecord));
+            return;
+          }
+          return openSieveDemo('map pin');
+        }
         searchRevision++;
         showNavigationStatus('');
         if (reference === barnardMarker) {

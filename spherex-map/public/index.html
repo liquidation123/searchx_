@@ -43,7 +43,13 @@
       <p><strong>Angular separation</strong> <span id="compare-separation"></span> <span>(on the sky)</span></p>
       <p>These records do not provide matched physical measurements.</p>
     </div>
-    <button id="compare-swap" type="button">Swap objects</button>
+    <div class="compare-actions">
+      <button id="compare-swap" type="button">Swap objects</button>
+      <button id="compare-summary-action" type="button" disabled>Generate Comparison Summary</button>
+      <button id="compare-report-action" type="button" disabled>Generate Report</button>
+    </div>
+    <p id="compare-report-status" role="status"></p>
+    <section id="comparison-summary" tabindex="-1" aria-label="Comparison summary" hidden></section>
   </section>
   <div id="notice" role="status">Starting the sky map…</div>
   <aside id="story-sidebar" aria-label="Explore panel"><header id="panel-header"><span id="panel-drag-title">Explore</span><button id="panel-close" type="button" aria-label="Close panel">×</button></header><div id="panel-body">
@@ -147,5 +153,18 @@
 <section id="quiz" class="story-section" hidden aria-labelledby="quiz-heading"><button type="button" id="quiz-back" class="text-button">← Back to story</button><p class="eyebrow" id="quiz-progress"></p><h2 id="quiz-heading" tabindex="-1"></h2><div id="quiz-answers" class="quiz-answers"></div><p id="quiz-feedback" role="status" aria-live="polite"></p><button type="button" id="quiz-next" hidden>Continue →</button><p id="quiz-complete" hidden></p><button id="explore-another" type="button" hidden>Explore another object →</button></section><div id="story-action" hidden><button type="button" id="quiz-start">Observe <span aria-hidden="true">→</span></button></div></div><div id="panel-resize" role="separator" aria-label="Resize information panel" aria-orientation="vertical" tabindex="0" aria-valuemin="300" aria-valuemax="440" aria-valuenow="340"></div></aside>
   <div class="coordinates"><output id="position"></output><a id="image-source" href="https://doi.org/10.26093/cds/aladin/ht9n-7r">DSS2 · STScI/NASA, CDS</a></div>
 </main>
+<dialog id="comparison-report" aria-label="Scientific comparison report preview">
+  <div id="report-tools">
+    <label for="report-mode">Presentation</label>
+    <select id="report-mode">
+      <option value="accessible">Accessible Summary</option>
+      <option value="research">Research Detail</option>
+    </select>
+    <button type="button" id="report-markdown">Download Markdown</button>
+    <button type="button" id="report-print">Print / Save as PDF</button>
+    <button type="button" id="report-close">Close preview</button>
+  </div>
+  <article id="report-content"></article>
+</dialog>
 </body>
 </html>

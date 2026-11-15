@@ -418,3 +418,51 @@ main[data-stage=understand] #story-action{display:none!important;}
   #comparison-panel { top:62px; right:10px; width:calc(100% - 20px); max-height:calc(100dvh - 82px); }
   #compare-instruction { bottom:112px; z-index:20; }
 }
+
+#compare-report-status:empty { display:none; }
+#comparison-summary { padding-top:16px; font-size:.87rem; line-height:1.5; overflow-wrap:anywhere; }
+#comparison-report {
+  color-scheme:light; color:#202c39; background:#fff;
+  width:min(850px, calc(100% - 24px)); max-height:calc(100dvh - 24px);
+  border:1px solid #dce4ec; border-radius:12px; padding:0; overflow:auto;
+}
+#comparison-report::backdrop { background:#0f192caa; }
+#report-tools {
+  position:sticky; top:0; display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  padding:12px; background:#f1f5f9; border-bottom:1px solid #dce4ec; font-size:.8rem;
+}
+#report-tools button, #report-tools select {
+  min-height:36px; padding:5px 8px; border:1px solid #cdd8e3;
+  border-radius:7px; background:#fff; color:#253344; font:inherit;
+}
+#report-content { max-width:760px; margin:auto; padding:clamp(16px, 5vw, 44px); line-height:1.55; overflow-wrap:anywhere; }
+#report-content h1 { font-size:clamp(1.45rem, 5vw, 2.35rem); line-height:1.15; margin-top:0; }
+#report-content h2 { font-size:1.18rem; margin:1.7em 0 .5em; color:#1c4060; }
+#report-content h3 { font-size:1rem; }
+#report-content a, #comparison-summary a { color:#1762a9; }
+#report-content table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:.84rem; }
+#report-content :is(th,td) { text-align:left; vertical-align:top; padding:8px; border:1px solid #dce4ec; }
+#report-content th { background:#f1f5f9; }
+#report-content figure { margin:12px 0 18px; }
+#report-content figure img { display:block; width:min(100%, 480px); height:auto; border-radius:6px; }
+#report-content figcaption { margin-top:6px; font-size:.82rem; }
+
+@media print {
+  html, body { background:#fff; color:#000; overflow:visible; }
+  body:has(#comparison-report[open]) > :not(#comparison-report), #report-tools { display:none !important; }
+  #comparison-report[open] {
+    position:static; display:block; overflow:visible; width:100%; max-width:none; max-height:none;
+    margin:0; padding:0; border:0; color:#000;
+  }
+  #comparison-report::backdrop { display:none; }
+  #report-content { max-width:none; padding:0; font-size:10pt; }
+  #report-content h2, #report-content h3 { break-after:avoid; }
+  #report-content tr, #report-content figure { break-inside:avoid; }
+  #report-content img { max-height:70mm; object-fit:contain; object-position:left; }
+  #report-content a { color:#000; text-decoration:underline; }
+}
+@media screen and (max-width:480px) {
+  #report-content table { font-size:.78rem; }
+  #report-content :is(th,td) { padding:6px; }
+  #report-content thead th:first-child { width:36%; }
+}

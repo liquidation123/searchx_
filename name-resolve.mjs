@@ -4,7 +4,10 @@ const unescapeXml = text => text?.replace(/&amp;/g,'&').replace(/&lt;/g,'<').rep
 export function parseSesame(xml) {
   const resolver = xml.match(/<Resolver\b[^>]*>([\s\S]*?)<\/Resolver>/)?.[1];
   if (!resolver) return null;
-  const ra=Number(tag(resolver,'jradeg')), dec=Number(tag(resolver,'jdedeg'));
+  const rawRa = tag(resolver, 'jradeg')?.trim();
+  const rawDec = tag(resolver, 'jdedeg')?.trim();
+  if (!rawRa || !rawDec) return null;
+  const ra = Number(rawRa), dec = Number(rawDec);
   if (!Number.isFinite(ra)||!Number.isFinite(dec)||ra<0||ra>=360||Math.abs(dec)>90) return null;
   const id=unescapeXml(tag(resolver,'oname'));
   return {ra,dec,id:id||null,category:unescapeXml(tag(resolver,'otype'))||null};

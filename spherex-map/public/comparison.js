@@ -74,13 +74,17 @@ export function comparisonSummary({ A, B }) {
   };
 }
 
-export function setupComparison({ focusSearch, selectedObject }) {
+export function setupComparison({ focusSearch, selectedObject, onChange }) {
   const byId = id => document.getElementById(id);
   const state = createComparison();
   const panel = byId('comparison-panel');
   const toggle = byId('compare-open');
   const instruction = byId('compare-instruction');
   const requests = new Map();
+  function change() {
+    onChange();
+    render();
+  }
 
   function show(open) {
     panel.hidden = !open;
@@ -162,7 +166,7 @@ export function setupComparison({ focusSearch, selectedObject }) {
   };
   byId('compare-close').onclick = () => { show(false); toggle.focus(); };
   byId('compare-cancel').onclick = () => { state.cancel(); instruction.hidden = true; show(true); toggle.focus(); };
-  byId('compare-swap').onclick = () => { state.swap(); render(); };
+  byId('compare-swap').onclick = () => { state.swap(); change(); };
   for (const slot of ['A', 'B']) {
     byId('compare-pick-' + slot).onclick = () => {
       state.arm(slot);
@@ -172,10 +176,11 @@ export function setupComparison({ focusSearch, selectedObject }) {
       focusSearch();
     };
     byId('compare-use-' + slot).onclick = () => {
-      if (state.assign(slot, selectedObject())) render();
+      if (state.assign(slot, selectedObject())) change();
     };
     byId('inspector-compare-' + slot).onclick = () => {
       if (!state.assign(slot, selectedObject())) return;
+      onChange();
       instruction.hidden = true;
       show(true);
       byId('compare-title').focus();
@@ -183,8 +188,17 @@ export function setupComparison({ focusSearch, selectedObject }) {
   }
   return {
     get pending() { return state.pending; },
+    get objects() { return state.objects; },
+    restore(pair) {
+      if (state.objects.A || state.objects.B || state.pending || !panel.hidden) return;
+      for (const slot of ['A', 'B']) state.assign(slot, pair[slot]);
+      onChange();
+      show(true);
+      if (!pair.A || !pair.B) byId('compare-report-status').textContent = 'A linked catalog record could not be restored. Select the missing object to continue.';
+    },
     accept(object) {
       if (!state.accept(object)) { if (!panel.hidden) render(); return false; }
+      onChange();
       instruction.hidden = true;
       show(true);
       byId('compare-title').focus();

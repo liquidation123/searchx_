@@ -14,3 +14,30 @@ test('invalid coordinates show an error',()=>assert.ok(search('400, 91').error))
 test('unknown terms do not invent a match',()=>assert.equal(search('zzqvxyz').results.length,0));
 test('upstream Horsehead entry has independent aliases and correct category',()=>{const r=search('Horsehead').results[0];assert.equal(r.id,'Barnard 33');assert.equal(r.category,'Nebula');assert.equal(search('B33').results[0].id,'Barnard 33')});
 test('upstream reference insertion preserves existing catalog mappings',()=>{assert.equal(search('M42').results[0].name,'Orion Nebula');assert.equal(search('M31').results[0].name,'Andromeda Galaxy');assert.equal(search('M101').results[0].name,'Pinwheel Galaxy')});
+
+test('featured targets resolve by public name and catalog aliases', () => {
+  const targets = [
+    ["Barnard’s Star", 'GJ 699', 'GJ699'],
+    ['Epsilon Indi B', 'eps Ind B', 'Epsilon Indi Ba/Bb'],
+    ['WISE 0855', 'WISE J085510.83-071442.5', 'WISE 0855-0714'],
+    ['RW Aurigae', 'RW Aur', 'RW Aur A'],
+    ['R Draconis', 'R Dra', 'HD 149880'],
+  ];
+  for (const [name, id, alias] of targets) {
+    const result = search(name).exact;
+    assert.equal(result?.type, 'object', name);
+    assert.equal(result.id, id);
+    assert.equal(search(alias).exact?.id, id);
+    assert.match(result.evidence.url, /^https:\/\//);
+  }
+  assert.equal(search('Barnard’s Star time-lapse').exact?.type, 'action');
+});
+
+test('WISE 0855 designation coordinates and epoch estimate remain distinct', () => {
+  const target = search('WISE 0855').exact;
+  const [ra, dec] = search('RA 08h55m10.831s, declination -7d14m42.53s').results[0].position;
+  assert.ok(Math.abs(ra - target.historical.ra) < 1e-9);
+  assert.ok(Math.abs(dec - target.historical.dec) < 1e-9);
+  assert.ok(target.ra < ra && target.dec > dec);
+  assert.ok(search('08h60m10.831s -7d14m42.53s').error);
+});

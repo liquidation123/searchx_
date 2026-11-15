@@ -20,8 +20,8 @@ const objectTerms = {
   'M 57': {category:'Nebula', aliases:['Ring','NGC 6720'], keywords:'planetary nebula'},
   'M 101': {category:'Galaxy', aliases:['M101','NGC 5457','Pinwheel','galaxy near the big dipper'], keywords:'spiral galaxy'}
 };
-const objects = references.map(x=>({...x, type:'object', ...(objectTerms[x.id] ?? {category:'Object', aliases:[], keywords:''})}));
-export const entries = [...objects, {id:'barnard-star',type:'action',category:'Time-lapse',name:"Barnard's Star",aliases:['barnard star','barnards star'],keywords:'moving star time lapse',description:'Explore a NEOWISE time-lapse.'}, ...lessons];
+const objects = references.map(x=>({...x, type:'object', ...(objectTerms[x.id] ?? {category:x.category ?? 'Object', aliases:x.aliases ?? [], keywords:x.description ?? ''})}));
+export const entries = [...objects, {id:'barnard-star',type:'action',category:'Time-lapse',name:"Barnard’s Star time-lapse",aliases:['Barnard time lapse'],keywords:'moving star time lapse',description:'Explore a NEOWISE time-lapse.'}, ...lessons];
 export const defaults = ['Barnard 33','M 42','M 31','barnard-star','birth','death'].map(id=>entries.find(e=>e.id===id));
 export const normalize = value => value.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(messier|m|ngc)\s*(\d+)/g,(_,a,b)=>a!=="ngc"?'m'+b:'ngc'+b).replace(/[^a-z0-9]+/g,' ').trim();
 export function catalogQuery(query) {
@@ -35,7 +35,7 @@ export function catalogQuery(query) {
 function distance(a,b) { if(Math.abs(a.length-b.length)>2)return 99; let prev=Array.from({length:b.length+1},(_,i)=>i); for(let i=1;i<=a.length;i++){const row=[i];for(let j=1;j<=b.length;j++)row[j]=Math.min(row[j-1]+1,prev[j]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=row;}return prev[b.length]; }
 export function search(query) {
   const raw=query.trim(); if(!raw)return {results:defaults};
-  if (/^[+\-\d.,:\s−]+$/.test(raw)) { try { const pos=coordinates(raw); if(pos)return {results:[{id:'coordinates',type:'coordinates',name:`RA ${pos[0]}°, Dec ${pos[1]}°`,description:'Go to this sky position',position:pos,category:'Coordinates'}]}; } catch(e) { return {results:[],error:e.message}; } }
+  if (/^[+\-\d.,:\s−]+$/.test(raw) || /\d+h\s*\d+m/i.test(raw)) { try { const pos=coordinates(raw); if(pos)return {results:[{id:'coordinates',type:'coordinates',name:`RA ${pos[0]}°, Dec ${pos[1]}°`,description:'Go to this sky position',position:pos,category:'Coordinates'}]}; } catch(e) { return {results:[],error:e.message}; } }
   if (/^[+\-\d.,:\s]+$/.test(raw)) return {results:[],error:'Enter a valid RA and Dec pair, for example 210.80227, 54.34895.'};
   const q=normalize(catalogQuery(raw)); if(q==='big sun')return {results:['sun','giants','largest'].map(id=>entries.find(e=>e.id===id)),ambiguous:true};
   const results=entries.map((e,index)=>{const name=normalize(e.name), id=normalize(e.id), aliases=e.aliases.map(normalize), keys=normalize(e.keywords); let score=0;

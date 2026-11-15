@@ -29,7 +29,7 @@
     <p class="eyebrow">START EXPLORING</p>
     <h2 id="welcome-title">Find something in the sky.</h2>
     <p>Search above or choose a starting point. Select a sky marker to open its story.</p>
-    <div class="quick-start"><span>START WITH</span><div id="quick-start-list"></div></div>
+    <div class="quick-start"><span>START WITH</span><div id="quick-start-list"></div><details class="featured-targets"><summary>Featured targets</summary><div id="featured-targets-list"></div></details></div>
   </section>
 
   <nav id="panel-stages" aria-label="Discovery stages"><button type="button" data-stage="discover">Discover</button><button type="button" data-stage="observe">Observe</button><button type="button" data-stage="understand">Learn</button></nav>
@@ -56,6 +56,7 @@
     <div id="observation-viewport" hidden>
       <img id="observation-image" alt="SPHEREx infrared exposure at the selected sky position" hidden>
     </div>
+    <p id="observation-target-evidence" hidden><a class="source-link" target="_blank" rel="noopener noreferrer"></a></p>
     <button id="observation-retry" type="button" hidden>Try again</button><p id="observation-alternative" hidden>Continue exploring the sky map, or <a href="https://irsa.ipac.caltech.edu/spherex-archive-documentation/spherex-data-access/" target="_blank" rel="noopener noreferrer">open NASA/IPAC’s SPHEREx data access guide ↗</a>.</p><a id="observation-fits-fallback" target="_blank" rel="noopener noreferrer" hidden>Download the original SPHEREx FITS cutout ↗</a>
     <div id="observation-player" hidden>
       <div id="observation-zoom" role="group" aria-label="Image zoom">
@@ -92,6 +93,8 @@
   </section>
 <section id="story-supplement" class="story-section" hidden>      <h3>Why it’s interesting</h3><p id="object-why"></p>
       <a id="object-learn" class="source-link" target="_blank" rel="noopener noreferrer">Explore further at NASA <span aria-hidden="true">↗</span></a>
+      <p id="featured-position-note" hidden></p>
+      <div id="featured-actions" hidden></div>
       <button id="object-observations" type="button" hidden>View SPHEREx observations</button>
       <details class="evidence"><summary>Scientific reference <span aria-hidden="true">+</span></summary>
         <p>Catalog position shown for context. This is not a SIEVE-verified detection.</p>

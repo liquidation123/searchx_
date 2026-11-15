@@ -1,4 +1,71 @@
 export const surveyRoot = 'https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube';
+const archiveEpoch = 2026;
+const aavsoCurve = name => 'https://www.aavso.org/LCGv2/index.htm?' + new URLSearchParams({
+  view: 'api.delim', ident: name, DateFormat: 'Calendar', RequestedBands: 'V',
+  fromjd: '2459000', tojd: '2461250',
+});
+
+function movingTarget(target, anchor, motion) {
+  // Approximate the center of the survey field using linear proper motion.
+  // The RA motion is μα cos δ in milliarcseconds per year.
+  const years = archiveEpoch - anchor.epoch;
+  const [east, north] = motion;
+  return {
+    ...target,
+    ra: anchor.ra + years * east / (3_600_000 * Math.cos(anchor.dec * Math.PI / 180)),
+    dec: anchor.dec + years * north / 3_600_000,
+    positionLabel: 'ICRS · estimated for 2026.0',
+  };
+}
+
+export const featuredTargets = [
+  movingTarget({
+    id: 'GJ 699', slug: 'barnards-star', name: 'Barnard’s Star', fov: .18,
+    category: 'Red dwarf', aliases: ["Barnard's Star", 'barnards star', 'barnard star', 'GJ699', 'Gliese 699', 'HIP 87937'],
+    description: 'A nearby red dwarf that moves about 10.4 arcseconds across the sky each year.',
+    source: 'Gaia DR3', url: 'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=Gaia+DR3+4472832130942575872',
+    evidence: { label: 'Open NASA’s Barnard’s Star record', url: 'https://exoplanetarchive.ipac.caltech.edu/overview/GJ-699' },
+    timeLapse: true,
+  }, {ra: 269.448503, dec: 4.739420, epoch: 2016}, [-801.551, 10362.394]),
+  movingTarget({
+    id: 'eps Ind B', slug: 'epsilon-indi-b', name: 'Epsilon Indi B', fov: .25,
+    category: 'Brown dwarf pair', aliases: ['ε Indi B', 'Epsilon Indi Ba/Bb', 'Epsilon Indi Ba', 'Epsilon Indi Bb',
+      'eps Ind Ba', 'eps Ind Bb', 'GJ 845 B', '2MASS J22041052-5646577'],
+    description: 'Ba and Bb orbit each other. Together they form a distant companion to the star Epsilon Indi A.',
+    source: '2MASS / McCaughrean et al.', url: 'https://www.aanda.org/articles/aa/pdf/2004/03/aa0292.pdf',
+    evidence: { label: 'See the resolved pair in ESO data', url: 'https://www.eso.org/sci/activities/vltsv/visirsv/sterzik.html',
+      note: 'The two brown dwarfs are separated by less than one arcsecond in the published images. SPHEREx shows their field.' },
+    historical: { label: '1999 2MASS position', ra: 331.04383333, dec: -56.78269444 },
+  }, {ra: 331.04383333, dec: -56.78269444, epoch: 1999.855}, [3960.93, -2539.23]),
+  movingTarget({
+    id: 'WISE J085510.83-071442.5', slug: 'wise-0855', name: 'WISE 0855', fov: .18,
+    category: 'Cold brown dwarf', aliases: ['WISE0855', 'WISE 0855-0714', 'WISEA J085510.74-071442.5', 'J085510.83-071442.5'],
+    description: 'A very cold brown dwarf. It shifts about 8 arcseconds per year and is extremely faint in visible light.',
+    source: 'Luhman & Esplin', url: 'https://arxiv.org/html/1605.06655',
+    evidence: { label: 'See the brown dwarf in infrared images', url: 'https://doi.org/10.1051/0004-6361/201628662',
+      note: 'Published infrared images identify it at earlier dates. A SPHEREx exposure covers the field and may not show the dwarf.' },
+    historical: {label: 'WISE designation coordinates', ra: 133.795129166667, dec: -7.245147222222},
+  }, {ra: 133.7840688, dec: -7.2441796, epoch: 2000 + (57123.17 - 51544.5) / 365.25}, [-8188, 680]),
+  {
+    id: 'RW Aur', slug: 'rw-aurigae', name: 'RW Aurigae', ra: 76.95654, dec: 30.40144, fov: .16,
+    category: 'Young variable star', aliases: ['RW Aur A', 'RW Aurigae A', 'HD 240764'],
+    description: 'A young binary with deep, irregular drops in brightness. Dust around the system can block light from the primary star.',
+    source: 'AAVSO VSX', url: 'https://vsx.aavso.org/index.php?revid=418953&view=detail.top',
+    positionLabel: 'ICRS · J2000.0',
+    evidence: { label: 'Open the observed AAVSO light curve', url: aavsoCurve('RW Aur'),
+      note: 'Use the light curve to look for dips in brightness over time.' },
+  },
+  {
+    id: 'R Dra', slug: 'r-draconis', name: 'R Draconis', ra: 248.16761083, dec: 66.75497942, fov: .16,
+    category: 'Mira variable', aliases: ['HD 149880', 'V* R Dra'],
+    description: 'A pulsating red giant in Draco. Its brightness rises and falls on a cycle of about 246 days.',
+    source: 'SIMBAD', url: 'https://simbad.u-strasbg.fr/simbad/sim-id?Ident=R+Dra',
+    positionLabel: 'ICRS · J2000.0',
+    evidence: { label: 'Open the observed AAVSO light curve', url: aavsoCurve('R Dra'),
+      note: 'Compare several peaks to see the repeating brightness cycle.' },
+  },
+];
+
 export const references = [
   { id: 'Barnard 33', name: 'Horsehead Nebula', ra: 85.24583, dec: -2.45833, fov: 1.25, description: 'A cloud of gas and dust that appears dark against the glowing gas behind it.', source: 'SIMBAD' },
   { id: 'M 42', name: 'Orion Nebula', ra: 83.82208, dec: -5.39111, fov: 2, description: 'A nearby cloud of glowing gas and dust where new stars are forming.', source: 'SIMBAD' },
@@ -8,10 +75,7 @@ export const references = [
   { id: 'M 45', name: 'Pleiades', ra: 56.75, dec: 24.1167, fov: 3, description: 'An open cluster of young stars also called the Seven Sisters.', source: 'SIMBAD' },
   { id: 'M 51', name: 'Whirlpool Galaxy', ra: 202.4696, dec: 47.1952, fov: 0.8, description: 'A spiral galaxy interacting with a smaller companion.', source: 'SIMBAD' },
   { id: 'M 57', name: 'Ring Nebula', ra: 283.3962, dec: 33.0291, fov: 0.4, description: 'A shell of gas shed by a dying star.', source: 'SIMBAD' },
-  { id: 'eps Ind B', name: 'Epsilon Indi B', ra: 331.09664, dec: -56.80066, fov: 0.25, description: 'A nearby brown dwarf pair. The pin shows an approximate position at epoch 2026.0.', source: 'SIMBAD' },
-  { id: 'WISE J085510.83-071442.5', name: 'WISE 0855', ra: 133.75989, dec: -7.24224, fov: 0.25, description: 'A nearby, very cold brown dwarf. The pin shows an approximate position at epoch 2026.0.', source: 'SIMBAD' },
-  { id: 'RW Aur', name: 'RW Aurigae', ra: 76.95653, dec: 30.40144, fov: 0.25, description: 'A young variable star system in Auriga. Position epoch J2000.0.', source: 'SIMBAD' },
-  { id: 'R Dra', name: 'R Draconis', ra: 248.16667, dec: 66.75472, fov: 0.25, description: 'A long-period variable star in Draco. Position epoch J2000.0.', source: 'SIMBAD' },
+  ...featuredTargets,
 ];
 
 export function parseProperties(raw) {
@@ -29,7 +93,11 @@ export function parseProperties(raw) {
 }
 
 export function coordinates(input) {
-  const pair = input.trim().replaceAll('−', '-').split(/\s*,\s*|\s+/);
+  const normalized = input.trim().replaceAll('−', '-');
+  const marked = normalized.match(/^(?:RA\s*[:=]?\s*)?(\d+)h\s*(\d+)m\s*(\d+(?:\.\d+)?)s\s*(?:,\s*)?(?:Dec(?:lination)?\s*[:=]?\s*)?([+-]?\d+)[d°]\s*(\d+)[m′']\s*(\d+(?:\.\d+)?)[s″"]$/i);
+  const pair = marked
+    ? [marked.slice(1, 4).join(':'), marked.slice(4, 7).join(':')]
+    : normalized.split(/\s*,\s*|\s+/);
   if (pair.length !== 2) return null;
   const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
   const sexagesimal = /^[+-]?\d+:\d{1,2}:\d{1,2}(?:\.\d+)?$/;

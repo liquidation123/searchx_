@@ -1,4 +1,4 @@
-import { parseProperties, references, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
+import { parseProperties, references, featuredTargets, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
 import { catalogQuery, search } from './search.js';
 import { uiState } from './ui-state.js';
 import { setupObservations } from './observations.js';
@@ -6,7 +6,7 @@ import { sieveDemo } from './sieve-demo.js';
 import { setupCatalogDiscovery } from './catalog-discovery.js';
 import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSelected, objectExplored, featureUsed, track } from '/analytics.js';
 
-import { barnardMarker, setupBarnard } from './barnard-timelapse.js';
+import { setupBarnard } from './barnard-timelapse.js';
 
 const byId = id => document.getElementById(id);
 const channel = byId('channel');
@@ -66,23 +66,69 @@ function inspect(reference) {
   for (const pin of byId('map-pins').children) {
     pin.setAttribute('aria-expanded', String(pin.dataset.reference === reference?.id));
   }
+  const observationEvidence = byId('observation-target-evidence');
+  observationEvidence.hidden = !reference?.evidence;
   if (!reference) return;
   objectExplored(reference);
   byId('object-fields').closest('details').open = false;
   byId('copy-status').textContent = '';
   const exhibit = exhibits[reference.id];
+  const evidence = reference.evidence;
   byId('object-type').textContent = exhibit?.type ?? reference.category ?? 'CATALOG SOURCE';
   byId('object-id').textContent = reference.id + '  ·  ' + reference.source;
-  byId('object-why').textContent = exhibit?.why ?? '';
-  byId('story-supplement').hidden = !exhibit;
-  if (exhibit) byId('object-learn').href = exhibit.url;
+  byId('object-why').textContent = exhibit?.why ?? evidence?.note ?? '';
+  byId('object-why').previousElementSibling.hidden = !byId('object-why').textContent;
+  byId('story-supplement').hidden = !exhibit && !evidence;
+  const learn = byId('object-learn');
+  if (evidence) {
+    const link = observationEvidence.querySelector('a');
+    link.href = evidence.url;
+    link.textContent = evidence.label + ' ↗';
+  }
+  if (exhibit || evidence) {
+    learn.href = (evidence ?? exhibit).url;
+    learn.textContent = (evidence?.label ?? 'Explore further at NASA') + ' ↗';
+  }
+  const positionNote = byId('featured-position-note');
+  positionNote.hidden = !reference.positionLabel;
+  positionNote.textContent = reference.positionLabel ? positionText(reference.ra, reference.dec) + ' · ' + reference.positionLabel : '';
+  if (reference.historical || reference.timeLapse) {
+    positionNote.textContent += ' · Estimated positions omit parallax and orbital motion.';
+  }
+  const actions = byId('featured-actions');
+  actions.replaceChildren();
+  if (reference.timeLapse) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Play NEOWISE time-lapse';
+    button.addEventListener('click', () => byId('barnard-shortcut').click());
+    actions.append(button);
+  }
+  if (reference.historical) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Show ' + reference.historical.label;
+    button.addEventListener('click', () => {
+      const historic = button.getAttribute('aria-pressed') !== 'true';
+      const {ra, dec} = historic ? reference.historical : reference;
+      pointAt(ra, dec, reference.fov);
+      button.setAttribute('aria-pressed', String(historic));
+      button.textContent = historic ? 'Return to 2026 position' : 'Show ' + reference.historical.label;
+      positionNote.textContent = historic
+        ? positionText(ra, dec) + ' · ' + reference.historical.label
+        : positionText(ra, dec) + ' · ' + reference.positionLabel + ' · Estimated positions omit parallax and orbital motion.';
+    });
+    button.setAttribute('aria-pressed', 'false');
+    actions.append(button);
+  }
+  actions.hidden = !actions.childElementCount;
   byId('object-name').textContent = reference.name;
   byId('favourite-feedback').textContent = '';
   syncFavourite();
   byId('object-description').textContent = reference.description || 'Position resolved by CDS Sesame; classification not available.';
   byId('object-catalog').textContent = reference.source + ' · ' + reference.id;
   byId('object-position').textContent = positionText(reference.ra, reference.dec);
-  byId('object-frame').textContent = 'Sky position · ' + (reference.radio ? 'J2000' : 'ICRS');
+  byId('object-frame').textContent = 'Sky position · ' + (reference.positionLabel ?? (reference.radio ? 'J2000' : 'ICRS'));
   byId('object-source').href = reference.url ??
     'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=' + encodeURIComponent(reference.id);
   if (selectObservations) {
@@ -698,7 +744,7 @@ async function start() {
       })();
     }
 
-    const pins = [...references, barnardMarker, sieveDemo].map(reference => {
+    const pins = [...references, sieveDemo].map(reference => {
       const pin = document.createElement('button');
       pin.className = 'map-pin';
       pin.type = 'button';
@@ -712,15 +758,6 @@ async function start() {
         if (reference === sieveDemo) return openSieveDemo('map pin');
         searchRevision++;
         showNavigationStatus('');
-        if (reference === barnardMarker) {
-          featureUsed('Barnard time lapse', 'map pin');
-          byId('lesson').hidden = true;
-          if (!byId('observation-panel').hidden) byId('observation-close').click();
-          inspect(null);
-          selectObservations.close();
-          openBarnard();
-          return;
-        }
         rememberTarget(reference.ra, reference.dec, reference === home ? 'Horsehead' : reference.id);
         dismiss(); if (selectedReference?.id === reference.id) { selectObservations.close(); inspect(null); } else { resultSelected(reference, 'map'); inspect(reference); }
       });
@@ -770,6 +807,13 @@ async function start() {
       button.addEventListener('click', () => goToReference(reference, 'starting point'));
       byId('quick-start-list').append(button);
     }
+    for (const reference of featuredTargets) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = reference.name + ' →';
+      button.addEventListener('click', () => goToReference(reference, 'starting point'));
+      byId('featured-targets-list').append(button);
+    }
     const barnardShortcut = byId('barnard-shortcut');
     barnardShortcut.addEventListener('click', () => {
       if (!byId('observation-panel').hidden) byId('observation-close').click();
@@ -808,6 +852,11 @@ async function start() {
         },
       });
       if (infraredUnavailable) showNotice('The shared infrared survey is unavailable. Showing the optical view.');
+    }
+    if (!shared && !invite && !sharedReview) {
+      const slug = new URLSearchParams(location.search).get('target');
+      const featured = featuredTargets.find(reference => reference.slug === slug);
+      if (featured) goToReference(featured, 'shared target');
     }
     byId('share-view').disabled = false;
   } catch (error) {

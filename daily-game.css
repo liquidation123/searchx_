@@ -98,3 +98,54 @@ body.game-page { min-height: 100%; height: auto; overflow-x: hidden; overflow-y:
   .frame-caption { font-size:.65rem; }
 }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; scroll-behavior:auto!important; } }
+
+/* Cleaner hierarchy: one candidate workspace, one focused response workspace. */
+.game-page { background:#f1f4f8; }
+.game-topbar { max-width:1220px; margin:0 auto 22px; padding:2px 2px 14px; border-bottom:1px solid #dce3eb; }
+.game-brand { font-size:1.3rem; }
+.game-brand span { color:#176cc1; }
+.game-panel { max-width:1220px; margin-left:auto; margin-right:auto; padding:clamp(18px,2.6vw,32px); border:1px solid #d5dee8; border-radius:16px; background:#e2e8ef; box-shadow:0 12px 36px #14263a0b; }
+.candidate-progress,.challenge-progress { border:0; background:transparent; margin:0 0 14px; padding:0 2px; min-height:32px; }
+.candidate-progress span:first-child,.challenge-progress span { color:#61758c; font-size:.77rem; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+.candidate-progress span:last-child { display:inline-flex; align-items:center; min-height:27px; padding:0 9px; border-radius:999px; background:#e7f1fc; color:#1762a9; }
+.candidate-grid { grid-template-columns:minmax(0,1.12fr) minmax(340px,.88fr); gap:clamp(20px,3vw,36px); }
+.observation-frame { height:clamp(300px,38vw,440px); min-height:260px; border-color:#d6e0ea; border-radius:12px; box-shadow:0 4px 16px #172b4110; }
+.algorithm-heading,.player-heading { min-height:80px; margin-bottom:12px; border:0; border-radius:12px; padding:9px 18px 9px 0; box-shadow:0 2px 9px #182a3a0a; }
+.game-rabbit { width:76px; height:78px; }
+.algorithm-heading h1,.player-heading h2 { font-size:clamp(1.25rem,1.8vw,1.65rem); }
+.algorithm-note { min-height:0; padding:17px 18px; border:0; border-radius:12px; box-shadow:0 2px 9px #182a3a0a; }
+.candidate-verdict { display:block; margin:0 0 10px; color:#1c2e43; font-size:1.25rem; font-weight:650; letter-spacing:-.025em; }
+.algorithm-details { border-top:1px solid #e5eaf0; padding-top:9px; }
+.algorithm-details summary { min-height:28px; color:#1762a9; font-size:.75rem; font-weight:650; cursor:pointer; }
+.algorithm-details p { margin:8px 0 0; color:#53677d; font-size:.82rem; }
+.algorithm-actions { gap:10px; margin-top:12px; }
+.control-button { min-height:46px; border-radius:10px; }
+.control-button.primary { background:#176cc1; border-color:#176cc1; }
+.candidate-meta { margin-top:11px; }
+.challenge-panel { grid-template-columns:minmax(260px,.88fr) minmax(370px,1.12fr); align-items:start; }
+.challenge-panel:not(.is-active) { opacity:1; }
+.challenge-panel.is-active { border-color:#176cc1; box-shadow:0 0 0 3px #176cc11c,0 12px 36px #14263a0b; }
+.challenge-image-frame { height:clamp(270px,33vw,390px); min-height:250px; border-radius:12px; box-shadow:0 4px 16px #172b4110; }
+.player-heading { margin-bottom:18px; }
+.challenge-actions { justify-content:flex-end; }
+.challenge-actions #back-to-candidate { margin-right:auto; }
+.inline-result:empty { display:none; }
+.next-candidate { min-width:150px; }
+@media(max-width:800px) {
+  .game-topbar { padding:0 2px 12px; }
+  .candidate-grid,.challenge-panel { grid-template-columns:1fr; }
+  .observation-frame { height:clamp(260px,65vw,400px); }
+  .challenge-image-frame { height:clamp(260px,65vw,380px); }
+}
+@media(max-width:430px) {
+  .game-panel { border-radius:13px; padding:13px; }
+  .observation-frame { min-height:240px; }
+  .algorithm-actions { grid-template-columns:1fr 1fr; }
+  .assessment-options { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .choice-button { font-size:.74rem; padding:7px 5px; }
+}
+.review-share-link { display:inline-block; color:#1762a9; font-weight:700; text-underline-offset:3px; }
+.review-share-link:hover { color:#104c88; }
+.observation-frame img,.challenge-image-frame img { background:#17212c; }
+.candidate-brief { margin:0 0 12px; color:#394c60; font-size:.9rem; line-height:1.45; }
+.algorithm-details { padding-top:8px; }

@@ -31,10 +31,10 @@
           </div>
           <div class="algorithm-column">
             <div class="algorithm-heading"><img class="game-rabbit" src="/rabbits/front.png" alt=""><div><p class="eyebrow">SIEVE REVIEW</p><h1 id="candidate-title">Candidate</h1></div></div>
-            <div class="algorithm-note"><span class="note-label">Algorithm says</span><p id="candidate-summary"></p></div>
+            <div class="algorithm-note"><span class="note-label">SIEVE assessment</span><strong id="candidate-verdict" class="candidate-verdict"></strong><p id="candidate-brief" class="candidate-brief"></p><details class="algorithm-details"><summary>Review the evidence</summary><p id="candidate-summary"></p></details></div>
             <div class="algorithm-actions">
               <button class="control-button primary" id="confirm-button" type="button">Confirm</button>
-              <button class="control-button" id="challenge-button" type="button">Challenge</button>
+              <button class="control-button" id="challenge-button" type="button">Challenge</button><button class="control-button primary next-candidate" id="next-candidate-top" type="button" hidden>Next candidate</button>
             </div>
             <p class="candidate-meta" id="candidate-position"></p>
             <p id="candidate-result" class="inline-result" aria-live="polite"></p>
@@ -48,7 +48,7 @@
           <div class="frame-caption"><span id="challenge-frame-label"></span><span id="challenge-frame-date"></span></div>
         </div>
         <div class="player-column">
-          <div class="player-heading"><img class="game-rabbit player-rabbit" src="/rabbits/front.png" alt=""><div><p class="eyebrow">YOUR TURN</p><h2 id="challenge-title">Your assessment</h2></div></div>
+          <div class="player-heading"><img class="game-rabbit player-rabbit" src="/rabbits/front.png" alt=""><div><p class="eyebrow">YOUR TURN</p><h2 id="challenge-title" tabindex="-1">Your assessment</h2></div></div>
           <fieldset class="assessment-fieldset">
             <legend>Does this look like an anomaly?</legend>
             <div class="assessment-options" id="assessment-options"></div>
@@ -59,7 +59,7 @@
           </fieldset>
           <label class="game-note-label" for="game-note">Your note <span>Optional</span></label>
           <textarea id="game-note" rows="3" maxlength="2000" placeholder="What stands out to you?"></textarea>
-          <div class="challenge-actions"><button class="control-button" id="back-to-candidate" type="button">Back</button><button class="control-button primary" id="submit-assessment" type="button">Submit assessment</button></div>
+          <div class="challenge-actions"><button class="control-button" id="back-to-candidate" type="button">Back</button><button class="control-button primary" id="submit-assessment" type="button">Submit assessment</button><button class="control-button primary next-candidate" id="next-candidate-challenge" type="button" hidden>Next candidate</button></div>
           <p id="challenge-result" class="inline-result" role="status" aria-live="polite"></p>
         </div>
       </section>

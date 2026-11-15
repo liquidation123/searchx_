@@ -101,8 +101,8 @@ export default async function handler(request, response) {
   }
   if (pathname === '/game-data' && request.method === 'GET') {
     const candidates = [sieveDemo].map(candidate => ({
-      id: candidate.id, name: candidate.name, source: 'SIEVE',
-      summary: candidate.summary, ra: candidate.ra, dec: candidate.dec,
+      id: candidate.id, name: candidate.name.replace(/^SIEVE demo /i, '').replace(/^candidate/i, 'Candidate'), source: 'SIEVE',
+      verdict: 'Needs review', summary: candidate.summary, ra: candidate.ra, dec: candidate.dec,
       sieveCommit: candidate.sieveCommit,
       frames: candidate.frames.map(frame => ({
         id: frame.id, observedAt: frame.observedAt, detector: frame.detector,

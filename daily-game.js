@@ -5,6 +5,8 @@ const challengeCount = document.querySelector('#challenge-count');
 const candidateSource = document.querySelector('#candidate-source');
 const title = document.querySelector('#candidate-title');
 const summary = document.querySelector('#candidate-summary');
+const verdict = document.querySelector('#candidate-verdict');
+const brief = document.querySelector('#candidate-brief');
 const position = document.querySelector('#candidate-position');
 const image = document.querySelector('#candidate-image');
 const challengeImage = document.querySelector('#challenge-image');
@@ -99,11 +101,24 @@ function renderCandidate() {
   challengeCount.textContent = `${candidateIndex + 1} of ${candidates.length}`;
   candidateSource.textContent = item.source ?? 'Candidate';
   title.textContent = item.name ?? item.id;
-  summary.textContent = item.summary ?? 'Review this candidate and share what you notice.';
+  verdict.textContent = item.verdict ?? 'Review suggested';
+  summary.textContent = item.summary ?? 'No additional evidence was provided.';
+  brief.textContent = item.brief ?? (item.summary?.split(/(?<=[.!?])\s+/, 1)[0] ?? 'Review the available observations.');
   position.textContent = `RA ${Number(item.ra).toFixed(3)}° · Dec ${Number(item.dec).toFixed(3)}°`;
   candidateResult.textContent = '';
   challengeResult.textContent = '';
   answered = false;
+  selectedAssessment = '';
+  selectedConfidence = '';
+  for (const button of [...assessmentOptions.querySelectorAll('button'), ...confidenceOptions.querySelectorAll('button')]) button.setAttribute('aria-pressed', 'false');
+  document.querySelector('#game-note').value = '';
+  document.querySelector('#confirm-button').hidden = false;
+  document.querySelector('#challenge-button').hidden = false;
+  document.querySelector('#confirm-button').disabled = false;
+  document.querySelector('#challenge-button').disabled = false;
+  document.querySelector('#submit-assessment').hidden = false;
+  document.querySelector('#submit-assessment').disabled = false;
+  document.querySelectorAll('.next-candidate').forEach(button => { button.hidden = true; });
   frameIndex = 0;
   updateFrame();
 }
@@ -119,44 +134,108 @@ function renderOptions() {
     selectChoice(value, confidenceOptions);
   });
 }
-function saveResponse(vote) {
+function localResponse(vote) {
   const item = candidate();
-  const note = document.querySelector('#game-note').value.trim();
   const context = {
-    ra: item.ra,
-    dec: item.dec,
-    candidateName: item.name,
-    source: item.source,
+    ra: item.ra, dec: item.dec, candidateName: item.name, source: item.source,
     confidence: selectedConfidence || undefined,
     frames: (item.frames ?? []).map(frame => ({ id: frame.id, observedAt: frame.observedAt })),
   };
-  return fetch('/community-feedback', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ candidateId: item.id, vote, note, context }),
-  });
+  const record = {
+    id: crypto.randomUUID(), candidateId: item.id, vote,
+    note: document.querySelector('#game-note').value.trim(), context,
+    createdAt: new Date().toISOString(),
+  };
+  const key = 'searchx.game.responses.v1';
+  let saved = [];
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    if (Array.isArray(existing)) saved = existing;
+  } catch {}
+  saved.push(record);
+  localStorage.setItem(key, JSON.stringify(saved));
+  return { ...record, storage: 'local' };
 }
+async function saveResponse(vote) {
+  const item = candidate();
+  const note = document.querySelector('#game-note').value.trim();
+  const context = {
+    ra: item.ra, dec: item.dec, candidateName: item.name, source: item.source,
+    confidence: selectedConfidence || undefined,
+    frames: (item.frames ?? []).map(frame => ({ id: frame.id, observedAt: frame.observedAt })),
+  };
+  let response;
+  try {
+    response = await fetch('/community-feedback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId: item.id, vote, note, context }),
+    });
+  } catch {
+    return localResponse(vote);
+  }
+  if (response.status === 503 || response.status >= 500) return localResponse(vote);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error ?? 'Could not save your assessment.');
+  }
+  return { ...(await response.json()), storage: 'cloud' };
+}
+function showSaved(result, vote) {
+  const voteLabel = { anomaly: 'Anomaly', not_anomaly: 'Not an anomaly', unsure: 'Not sure' }[vote];
+  const shareUrl = result.storage === 'cloud'
+    ? new URL(`/community-reviews/${result.id}`, location.origin).href
+    : '';
+  const messages = result.storage === 'cloud'
+    ? [`${voteLabel} saved.`, 'Your assessment is saved.']
+    : [`${voteLabel} saved on this device.`, 'Saved on this device. Cloud sync is not set up yet.'];
+  for (const [node, message] of [[candidateResult, messages[0]], [challengeResult, messages[1]]]) {
+    node.replaceChildren(document.createTextNode(message + ' '));
+    if (shareUrl) {
+      const link = document.createElement('a');
+      link.href = shareUrl;
+      link.textContent = 'Open review ↗';
+      link.className = 'review-share-link';
+      node.append(link);
+    }
+  }
+  document.querySelector('#confirm-button').hidden = true;
+  document.querySelector('#challenge-button').hidden = true;
+  document.querySelector('#submit-assessment').hidden = true;
+  if (candidateIndex + 1 < candidates.length) {
+    const next = challengePanel.classList.contains('is-active') ? document.querySelector('#next-candidate-challenge') : document.querySelector('#next-candidate-top');
+    next.hidden = false;
+  } else {
+    const done = ' You’ve reviewed all available candidates.';
+    candidateResult.append(document.createTextNode(done));
+    challengeResult.append(document.createTextNode(done));
+  }
+}
+
 async function submit(vote) {
   if (answered) return;
   answered = true;
   document.querySelector('#confirm-button').disabled = true;
   document.querySelector('#challenge-button').disabled = true;
+  document.querySelector('#submit-assessment').disabled = true;
   try {
-    const response = await saveResponse(vote);
-    if (!response.ok) throw new Error((await response.json()).error ?? 'Could not save your assessment.');
-    const result = await response.json();
-    candidateResult.textContent = `Assessment saved. Share it with this link: ${new URL(`/community-reviews/${result.id}`, location.origin).href}`;
-    challengeResult.textContent = 'Assessment saved. Thank you for taking part.';
+    const result = await saveResponse(vote);
+    showSaved(result, vote);
   } catch (error) {
     answered = false;
     document.querySelector('#confirm-button').disabled = false;
     document.querySelector('#challenge-button').disabled = false;
-    const message = error.message.includes('storage is not configured')
-      ? 'Response storage is not configured yet. Your assessment could not be saved.'
-      : error.message;
+    document.querySelector('#submit-assessment').disabled = false;
+    const message = error.message;
     if (challengePanel.classList.contains('is-active')) challengeResult.textContent = message;
     else candidateResult.textContent = message;
   }
+}
+function nextCandidate() {
+  if (candidateIndex + 1 >= candidates.length) return;
+  candidateIndex += 1;
+  challengePanel.classList.remove('is-active');
+  renderCandidate();
+  document.querySelector('.candidate-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 document.querySelector('#confirm-button').addEventListener('click', () => submit('anomaly'));
@@ -165,6 +244,8 @@ document.querySelector('#challenge-button').addEventListener('click', () => {
   challengePanel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
   document.querySelector('#challenge-title').focus({ preventScroll: true });
 });
+document.querySelector('#next-candidate-top').addEventListener('click', nextCandidate);
+document.querySelector('#next-candidate-challenge').addEventListener('click', nextCandidate);
 document.querySelector('#back-to-candidate').addEventListener('click', () => {
   challengePanel.classList.remove('is-active');
   document.querySelector('.candidate-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });

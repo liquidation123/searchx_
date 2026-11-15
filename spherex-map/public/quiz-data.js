@@ -11,7 +11,7 @@ const draconis = 'https://britastro.org/vss/objects/obj-dra.html';
 const question = (reference, question, choices, correct, feedback) => ({ reference, question, choices, correct, feedback });
 
 const sets = {
-  'barnard-star': [
+  'GJ 699': [
     question(barnard, 'How far away is Barnard’s Star?', ['About 6 light-years', 'About 60 light-years', 'About 600 light-years'], 0, 'At roughly six light-years, Barnard’s Star is one of the Sun’s nearest stellar neighbors.'),
     question(barnard, 'What kind of star did Chandra and Hubble study in the Barnard’s Star system?', ['A young blue giant', 'An old red dwarf', 'A cooling white dwarf'], 1, 'Barnard’s Star is a cool, low-mass red dwarf estimated to be about 10 billion years old.'),
     question(barnardPlanets, 'What did high-precision velocity measurements reveal around Barnard’s Star?', ['A companion white dwarf', 'A single Jupiter-sized planet', 'Four planets less massive than Earth'], 2, 'Small changes in the star’s velocity helped establish four close-orbiting sub-Earth-mass planets.'),

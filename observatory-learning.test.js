@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { barnardMarker } from './spherex-map/public/barnard-timelapse.js';
 import { references } from './spherex-map/public/sky-data.js';
 import { angularSeparation, comparisonSummary, createComparison } from './spherex-map/public/comparison.js';
 import { catalogIdentifier, search, selectSkyTarget } from './spherex-map/public/search.js';
@@ -58,7 +57,7 @@ test('separation is spherical and comparison only pairs like catalog properties'
 
 test('each curated object has unique reviewed questions, answers, explanations and references', () => {
   const prompts = new Set();
-  for (const { id } of [...references, barnardMarker]) {
+  for (const { id } of references) {
     const questions = questionsFor(id);
     assert.ok(questions.length >= 3 && questions.length <= 5, id);
     for (const { question, choices, correct, feedback, reference } of questions) {

@@ -1,4 +1,4 @@
-import { hasSkyPosition, parseProperties, references, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
+import { hasSkyPosition, parseProperties, references, featuredTargets, decodeView, encodeView, restoreView, normalizeFavourite, parseFavourites } from './sky-data.js';
 import { catalogIdentifier, catalogQuery, search, selectSkyTarget } from './search.js';
 import { questionsFor } from './quiz-data.js';
 import { setupComparison } from './comparison.js';
@@ -8,11 +8,7 @@ import { sieveDemo } from './sieve-demo.js';
 import { setupCatalogDiscovery } from './catalog-discovery.js';
 import { searchStartedEvent, searchSubmitted, resultsShown, noResults, resultSelected, objectExplored, featureUsed, track } from '/analytics.js';
 
-import { barnardMarker, setupBarnard } from './barnard-timelapse.js';
-
-const barnardReference = { ...barnardMarker, source: 'SIMBAD', category: 'Red dwarf',
-  description: 'Nearby star with high proper motion. SearchX shows its historical NEOWISE time-lapse.',
-  url: 'https://simbad.cds.unistra.fr/simbad/sim-id?Ident=Barnard%27s%20Star' };
+import { setupBarnard } from './barnard-timelapse.js';
 
 const byId = id => document.getElementById(id);
 const channel = byId('channel');
@@ -30,6 +26,7 @@ const exhibits = {
 function syncState() { document.querySelector('main').dataset.state = uiState({searchOpen:!byId('search-popup').hidden, inspectorOpen:!byId('inspector').hidden, lessonOpen:!byId('lesson').hidden}); }
 const blankFrames = new Set([50, 51]);
 const home = references[0];
+let mapSession = null;
 const loadedFrames = new Set();
 let viewer, A, layer, selectObservations;
 let showResolvedMarker = () => {};
@@ -58,10 +55,10 @@ function updatePosition() {
 }
 
 function inspect(reference) {
-  if (reference) { byId("guide").open = false; byId('lesson').hidden = true; }
+  if (reference) { byId('guide').open = false; byId('panel-tools').open = false; byId('lesson').hidden = true; }
 
   selectedReference = reference;
-  byId('panel-drag-title').textContent = reference?.name || 'Explore';
+  byId('panel-drag-title').textContent = reference ? 'Object story' : 'Explore';
   byId('inspector').hidden = !reference;
   byId('story-supplement').hidden = !reference;
   byId('panel-stages').querySelector('[data-stage=understand]').hidden = !reference;
@@ -71,28 +68,74 @@ function inspect(reference) {
   for (const pin of byId('map-pins').children) {
     pin.setAttribute('aria-expanded', String(pin.dataset.reference === reference?.id));
   }
+  const observationEvidence = byId('observation-target-evidence');
+  observationEvidence.hidden = !reference?.evidence;
   if (!reference) return;
   objectExplored(reference);
   byId('object-fields').closest('details').open = false;
   byId('copy-status').textContent = '';
   const exhibit = exhibits[reference.id];
+  const evidence = reference.evidence;
   byId('object-type').textContent = exhibit?.type ?? reference.category ?? 'CATALOG SOURCE';
   byId('object-id').textContent = reference.id + '  ·  ' + reference.source;
-  byId('object-why').textContent = exhibit?.why ?? '';
-  byId('story-supplement').hidden = !exhibit;
-  if (exhibit) byId('object-learn').href = exhibit.url;
+  byId('object-why').textContent = exhibit?.why ?? evidence?.note ?? '';
+  byId('object-why').previousElementSibling.hidden = !byId('object-why').textContent;
+  byId('story-supplement').hidden = !exhibit && !evidence;
+  const learn = byId('object-learn');
+  if (evidence) {
+    const link = observationEvidence.querySelector('a');
+    link.href = evidence.url;
+    link.textContent = evidence.label + ' ↗';
+  }
+  if (exhibit || evidence) {
+    learn.href = (evidence ?? exhibit).url;
+    learn.textContent = (evidence?.label ?? 'Explore further at NASA') + ' ↗';
+  }
+  const positionNote = byId('featured-position-note');
+  positionNote.hidden = !reference.positionLabel;
+  positionNote.textContent = reference.positionLabel ? positionText(reference.ra, reference.dec) + ' · ' + reference.positionLabel : '';
+  if (reference.historical || reference.timeLapse) {
+    positionNote.textContent += ' · Estimated positions omit parallax and orbital motion.';
+  }
+  const actions = byId('featured-actions');
+  actions.replaceChildren();
+  if (reference.timeLapse) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Play NEOWISE time-lapse';
+    button.addEventListener('click', () => byId('barnard-shortcut').click());
+    actions.append(button);
+  }
+  if (reference.historical) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Show ' + reference.historical.label;
+    button.addEventListener('click', () => {
+      const historic = button.getAttribute('aria-pressed') !== 'true';
+      const {ra, dec} = historic ? reference.historical : reference;
+      pointAt(ra, dec, reference.fov);
+      button.setAttribute('aria-pressed', String(historic));
+      button.textContent = historic ? 'Return to 2026 position' : 'Show ' + reference.historical.label;
+      positionNote.textContent = historic
+        ? positionText(ra, dec) + ' · ' + reference.historical.label
+        : positionText(ra, dec) + ' · ' + reference.positionLabel + ' · Estimated positions omit parallax and orbital motion.';
+    });
+    button.setAttribute('aria-pressed', 'false');
+    actions.append(button);
+  }
+  actions.hidden = !actions.childElementCount;
   byId('object-name').textContent = reference.name;
   byId('favourite-feedback').textContent = '';
   syncFavourite();
   byId('object-description').textContent = reference.description || 'Position resolved by CDS Sesame; classification not available.';
   byId('object-catalog').textContent = reference.source + ' · ' + reference.id;
   byId('object-position').textContent = positionText(reference.ra, reference.dec);
-  byId('object-frame').textContent = 'Sky position · ' + (reference.radio ? 'J2000' : 'ICRS');
+  byId('object-frame').textContent = 'Sky position · ' + (reference.positionLabel ?? (reference.radio ? 'J2000' : 'ICRS'));
   const link = byId('object-source');
   link.hidden = reference.source === 'Entered coordinates';
   link.href = referenceUrl(reference) ?? '#';
   comparison.accept(comparable(reference));
-  if (selectObservations && reference.id !== barnardMarker.id) {
+  if (selectObservations && !reference.historicalTimeLapse) {
     if (reference.radio) selectObservations.radio(reference);
     else void selectObservations(reference.ra, reference.dec);
   }
@@ -285,7 +328,9 @@ byId('share-view').addEventListener('click', async () => {
     const state = {ra: Number(((ra % 360 + 360) % 360).toPrecision(12)) % 360, dec: Number(dec.toPrecision(12)),
       fov: Number(viewer.getFoV()[0].toPrecision(12)), survey: survey.value};
     if (state.survey === 'infrared') state.channel = Number(channel.value);
-    const url = encodeView(location.href, state);
+    const sharedUrl = new URL(encodeView(location.href, state));
+    if (mapSession) sharedUrl.searchParams.set('map', mapSession.code);
+    const url = sharedUrl.href;
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
       await navigator.clipboard.writeText(url);
@@ -564,6 +609,7 @@ function showQuestion() {
 }
 byId('quiz-start').addEventListener('click',()=>setStage(document.querySelector('main').dataset.stage==='discover'?'observe':'understand'));
 byId('quiz-back').addEventListener('click',()=>setStage('observe'));
+byId('observation-back').addEventListener('click',()=>setStage('discover'));
 byId('quiz-next').addEventListener('click', () => {
   if (quizIndex + 1 < quizQuestions.length) {
     quizIndex++;
@@ -584,6 +630,7 @@ byId('quiz-next').addEventListener('click', () => {
 function setStage(stage, objectId = selectedReference?.id) {
   if (stage === 'understand' && !selectedReference) return;
   if (document.querySelector('main').dataset.stage !== stage) {
+    byId('panel-tools').open = false;
     featureUsed('panel stage', stage);
     if (stage === 'observe') track('Observation Viewed', { object_id: objectId });
   }
@@ -603,7 +650,8 @@ function setStage(stage, objectId = selectedReference?.id) {
     }
   }
   for(const button of byId('panel-stages').querySelectorAll('button')) button.setAttribute('aria-current',button.dataset.stage===stage?'step':'false');
-  byId('quiz-start').innerHTML=stage==='discover'?'Observe <span aria-hidden="true">→</span>':'Understand <span aria-hidden="true">→</span>';
+  byId('observation-back').hidden = stage !== 'observe' || !selectedReference;
+  byId('quiz-start').innerHTML=stage==='discover'?'View observations <span aria-hidden="true">→</span>':'Test what you learned <span aria-hidden="true">→</span>';
   byId('story-action').hidden=stage==='understand' || (stage==='observe' && !selectedReference);
 }
 for(const button of byId('panel-stages').querySelectorAll('button')) button.addEventListener('click',()=>setStage(button.dataset.stage));
@@ -618,7 +666,7 @@ function syncPanelVisibility() {
   byId('panel-open').setAttribute('aria-expanded',String(open));
 }
 byId('panel-open').addEventListener('click',()=>{panelRequested=true;syncPanelVisibility();});
-byId('panel-close').addEventListener('click',()=>{panelRequested=false;selectObservations?.close(); inspect(null); byId('lesson').hidden=true; byId('barnard-panel').hidden=true; syncPanelVisibility();});
+byId('panel-close').addEventListener('click',()=>{panelRequested=false;byId('panel-tools').open=false;selectObservations?.close(); inspect(null); byId('lesson').hidden=true; byId('barnard-panel').hidden=true; syncPanelVisibility();});
 const storyObserver = new MutationObserver(()=>{
   syncPanelVisibility();
   const visible=document.querySelector('main').classList.contains('story-selected');
@@ -629,6 +677,18 @@ for(const id of ['inspector','lesson','observation-panel','barnard-panel']) stor
 
 async function start() {
   try {
+    const invite = new URLSearchParams(location.search).get('map');
+    if (invite) {
+      try {
+        if (!/^[A-HJ-NP-Z2-9]{10}$/i.test(invite)) throw new Error('Invalid invite code.');
+        const reply = await fetch('/map-sessions/' + encodeURIComponent(invite));
+        const result = await reply.json();
+        if (!reply.ok) throw new Error(result.error || 'Map invite unavailable.');
+        mapSession = result;
+      } catch (error) {
+        showNotice(`${error.message} You can create or join a map at /maps.`);
+      }
+    }
     const metadata = fetch('/irsa.properties').then(response => {
       if (!response.ok) throw new Error('Wavelength labels unavailable.');
       return response.text();
@@ -698,7 +758,7 @@ async function start() {
       })();
     }
 
-    const pins = [...references, barnardMarker, sieveDemo].map(reference => {
+    const pins = [...references, sieveDemo].map(reference => {
       const pin = document.createElement('button');
       pin.className = 'map-pin';
       pin.type = 'button';
@@ -712,11 +772,6 @@ async function start() {
         if (reference === sieveDemo) return openSieveDemo('map pin');
         searchRevision++;
         showNavigationStatus('');
-        if (reference === barnardMarker) {
-          featureUsed('Barnard time lapse', 'map pin');
-          byId('barnard-shortcut').click();
-          return;
-        }
         rememberTarget(reference.ra, reference.dec, reference === home ? 'Horsehead' : reference.id);
         dismiss(); if (selectedReference?.id === reference.id && comparison.accept(comparable(reference))) return;
         if (selectedReference?.id === reference.id) { selectObservations.close(); inspect(null); } else { resultSelected(reference, 'map'); inspect(reference); }
@@ -758,6 +813,22 @@ async function start() {
       button.addEventListener('click', () => goToReference(reference));
       byId('references').append(button);
     }
+    for (const id of ['Barnard 33', 'M 42', 'M 31']) {
+      const reference = references.find(item => item.id === id);
+      if (!reference) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = reference.name + ' →';
+      button.addEventListener('click', () => goToReference(reference, 'starting point'));
+      byId('quick-start-list').append(button);
+    }
+    for (const reference of featuredTargets) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = reference.name + ' →';
+      button.addEventListener('click', () => goToReference(reference, 'starting point'));
+      byId('featured-targets-list').append(button);
+    }
     const barnardShortcut = byId('barnard-shortcut');
     barnardShortcut.addEventListener('click', () => {
       if (!byId('observation-panel').hidden) byId('observation-close').click();
@@ -765,7 +836,7 @@ async function start() {
       byId('lesson').hidden = true;
       dismiss();
       selectObservations.close();
-      inspect(barnardReference);
+      inspect({ ...featuredTargets.find(target => target.id === 'GJ 699'), historicalTimeLapse: true });
       setStage('observe');
       openBarnard();
     });
@@ -777,13 +848,16 @@ async function start() {
     const wavelengths = await metadata;
     survey.disabled = false;
     if (!wavelengths) { survey.options[1].textContent = 'SPHEREx · unavailable'; survey.options[1].disabled = true; }
+    if (mapSession && mapSession.datasets !== 'all') {
+      for (const option of survey.options) option.disabled = option.disabled || !mapSession.datasets.includes(option.value);
+    }
     (wavelengths ?? []).forEach((wavelength, index) => {
       channel.add(new Option(`${wavelength.toFixed(3)} µm${blankFrames.has(index) ? ' · no image' : ''}`, index));
       channel.options[index].disabled = blankFrames.has(index);
     });
     channel.value = String(activeFrame);
     channel.disabled = true;
-    const shared = decodeView(location.search, wavelengths?.length ?? 102);
+    const shared = decodeView(location.search, wavelengths?.length ?? 102) ?? mapSession?.view;
     if (shared) {
       const infraredUnavailable = shared.survey === 'infrared' && !wavelengths;
       restoreView(infraredUnavailable ? {...shared, survey:'optical', channel:undefined} : shared, {
@@ -795,6 +869,11 @@ async function start() {
         },
       });
       if (infraredUnavailable) showNotice('The shared infrared survey is unavailable. Showing the optical view.');
+    }
+    if (!shared && !invite && !sharedReview) {
+      const slug = new URLSearchParams(location.search).get('target');
+      const featured = featuredTargets.find(reference => reference.slug === slug);
+      if (featured) goToReference(featured, 'shared target');
     }
     byId('share-view').disabled = false;
   } catch (error) {
@@ -830,5 +909,8 @@ byId('panel-header').addEventListener('pointerdown',event=>{if(event.target.clos
 byId('panel-resize').addEventListener('pointerdown',event=>{if(matchMedia('(max-width:850px)').matches)return;event.preventDefault();event.target.setPointerCapture(event.pointerId);const width=panelWidth,x=event.clientX;const move=e=>applyWidth(width+e.clientX-x);const up=()=>{event.target.removeEventListener('pointermove',move);event.target.removeEventListener('pointerup',up);};event.target.addEventListener('pointermove',move);event.target.addEventListener('pointerup',up,{once:true});});
 byId('panel-resize').addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();applyWidth(panelWidth+(event.key==='ArrowRight'?10:-10));}else if(event.key==='Home'||event.key==='End'){event.preventDefault();applyWidth(event.key==='Home'?300:440);}});
 addEventListener('resize',()=>{if(floating && matchMedia('(max-width:850px)').matches) dock(); else if(floating) positionPanel(panel.offsetLeft,panel.offsetTop);});
-new ResizeObserver(() => { if (floating && !matchMedia('(max-width:850px)').matches) positionPanel(panel.offsetLeft,panel.offsetTop); }).observe(panel);
-applyWidth(340);
+new ResizeObserver(() => {
+  if (matchMedia('(max-width:850px)').matches) main.style.setProperty('--sheet-height',panel.getBoundingClientRect().height+'px');
+  else { main.style.removeProperty('--sheet-height'); if (floating) positionPanel(panel.offsetLeft,panel.offsetTop); }
+}).observe(panel);
+applyWidth(380);
